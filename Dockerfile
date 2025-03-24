@@ -1,9 +1,12 @@
 FROM node:20-alpine
 
 # Install yt-dlp, ffmpeg and required dependencies
-RUN apk add --no-cache python3 py3-pip ffmpeg curl && \
-    pip3 install --no-cache-dir yt-dlp && \
-    apk add --no-cache tzdata
+RUN apk add --no-cache python3 py3-pip ffmpeg curl tzdata && \
+    # Create a virtual environment to install yt-dlp
+    python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir yt-dlp && \
+    # Create a symlink to make yt-dlp accessible in PATH
+    ln -s /opt/venv/bin/yt-dlp /usr/local/bin/yt-dlp
 
 # Create app directory
 WORKDIR /app
