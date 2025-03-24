@@ -1,0 +1,124 @@
+import { NavLink } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  FilmIcon, 
+  ArrowDownTrayIcon, 
+  QueueListIcon,
+  TagIcon
+} from '@heroicons/react/24/outline';
+import { FilmIcon as FilmIconSolid, 
+  ArrowDownTrayIcon as ArrowDownTrayIconSolid, 
+  QueueListIcon as QueueListIconSolid, 
+  TagIcon as TagIconSolid } from '@heroicons/react/24/solid';
+import { useDownload } from '../../context/DownloadContext';
+
+const Sidebar = ({ isOpen }) => {
+  const { activeDownloads } = useDownload();
+  const downloadCount = activeDownloads?.length || 0;
+
+  const sidebarVariants = {
+    open: { width: 240, opacity: 1 },
+    closed: { width: 0, opacity: 0 }
+  };
+  
+  // Helper to use solid icons when active
+  const NavItem = ({ to, icon, activeIcon, label, badge = null }) => (
+    <NavLink 
+      to={to}
+      className={({ isActive }) => 
+        `sidebar-item group ${isActive ? 'active' : ''}`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <div className="relative">
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              className={`transition-colors ${isActive ? 'text-accent' : 'text-text-secondary group-hover:text-white'}`}
+            >
+              {isActive ? activeIcon : icon}
+            </motion.div>
+            
+            {badge && (
+              <motion.div 
+                className="absolute -top-1 -right-1 bg-accent text-white text-xs w-4 h-4 flex items-center justify-center rounded-full"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", stiffness: 500, damping: 25 }}
+              >
+                {badge}
+              </motion.div>
+            )}
+          </div>
+          
+          <span className={`font-medium transition-colors ${isActive ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
+            {label}
+          </span>
+        </>
+      )}
+    </NavLink>
+  );
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="bg-secondary h-full overflow-hidden shadow-xl relative"
+          initial="closed"
+          animate="open"
+          exit="closed"
+          variants={sidebarVariants}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+        >
+          <div className="flex flex-col h-full">
+            
+            {/* Main navigation */}
+            <div className="flex-1 overflow-y-auto pt-6 pb-4 px-4 sidebar-content">
+              <div className="space-y-1">
+                <NavItem 
+                  to="/" 
+                  icon={<FilmIcon className="w-6 h-6" />}
+                  activeIcon={<FilmIconSolid className="w-6 h-6" />}
+                  label="Library" 
+                />
+                
+                <NavItem 
+                  to="/downloads" 
+                  icon={<ArrowDownTrayIcon className="w-6 h-6" />}
+                  activeIcon={<ArrowDownTrayIconSolid className="w-6 h-6" />}
+                  label="Downloads" 
+                  badge={downloadCount > 0 ? downloadCount : null}
+                />
+                
+                <NavItem 
+                  to="/playlists" 
+                  icon={<QueueListIcon className="w-6 h-6" />}
+                  activeIcon={<QueueListIconSolid className="w-6 h-6" />}
+                  label="Playlists" 
+                />
+                
+                <NavItem 
+                  to="/tags" 
+                  icon={<TagIcon className="w-6 h-6" />}
+                  activeIcon={<TagIconSolid className="w-6 h-6" />}
+                  label="Tags" 
+                />
+              </div>
+            </div>
+            
+            {/* Bottom section with version info */}
+            <div className="pt-4 pb-6 px-6 text-xs text-text-secondary/50 border-t border-[#3f3f3f]/30">
+              <p>TubeOffline v0.1.0</p>
+            </div>
+          </div>
+          
+          {/* Right edge glow effect */}
+          <div className="absolute top-0 right-0 w-1 h-full bg-gradient-to-r from-transparent to-accent/10" />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+export default Sidebar;
