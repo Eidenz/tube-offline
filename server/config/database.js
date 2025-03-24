@@ -3,22 +3,20 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import config from '../config.js';
 
 // Get current directory (ES Module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Create data directory if it doesn't exist
-const dataDir = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
+// Ensure the database directory exists
+const dbDir = path.dirname(config.dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
 }
 
-// Database file path
-const dbPath = path.join(dataDir, 'tube-offline.db');
-
 // Initialize database connection
-const db = new BetterSqlite3(dbPath);
+const db = new BetterSqlite3(config.dbPath);
 
 // Schema creation - tables for videos, playlists, tags, downloads
 function initializeDatabase() {
@@ -43,17 +41,6 @@ function initializeDatabase() {
           last_viewed TIMESTAMP,
           date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           metadata TEXT
-        )
-      `);
-      
-      // Create favorites table
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS favorites (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          video_id INTEGER NOT NULL,
-          date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE,
-          UNIQUE(video_id)
         )
       `);
       
@@ -135,7 +122,6 @@ function initializeDatabase() {
         CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
         CREATE INDEX IF NOT EXISTS idx_history_video_id ON history(video_id);
         CREATE INDEX IF NOT EXISTS idx_history_watched_at ON history(watched_at);
-        CREATE INDEX IF NOT EXISTS idx_favorites_video_id ON favorites(video_id);
       `);
       
       console.log('Database schema initialized successfully');

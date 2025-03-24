@@ -1,0 +1,26 @@
+# Node.js dependencies and build
+node_modules
+npm-debug.log
+
+# Build outputs
+dist
+build
+
+# Data directory (we'll mount this as a volume)
+data
+
+# Dev environment
+.git
+.github
+.vscode
+*.md
+!README.md
+.env*
+!.env.example
+
+# Docker files (not needed inside the container)
+Dockerfile
+docker-compose.yml
+
+# Other unnecessary files
+*.log

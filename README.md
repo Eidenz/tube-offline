@@ -15,7 +15,31 @@ An elegant offline YouTube video library using YT-DLP with a React frontend and 
 - Real-time download progress updates
 - Search functionality for your offline library
 
-## Prerequisites
+## Running with Docker (Recommended)
+
+The easiest way to run TubeOffline is using Docker:
+
+1. Make sure you have [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed
+
+2. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/tube-offline.git
+   cd tube-offline
+   ```
+
+3. Make the management script executable and start the application:
+   ```bash
+   chmod +x tubeoffline.sh
+   ./tubeoffline.sh start
+   ```
+
+4. Access TubeOffline in your browser at http://localhost:5000 (or your custom port if configured)
+
+For more details on using Docker, see [README-Docker.md](README-Docker.md).
+
+## Manual Installation
+
+### Prerequisites
 
 - [Node.js](https://nodejs.org/) (v14 or higher)
 - [npm](https://www.npmjs.com/) (v6 or higher)
@@ -40,7 +64,7 @@ sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o
 sudo chmod a+rx /usr/local/bin/yt-dlp
 ```
 
-## Installation
+### Installation
 
 1. Clone the repository:
 ```bash
@@ -79,13 +103,10 @@ npm start
 
 ## Configuration
 
-You can modify the server configuration in `server/.env`:
+You can modify the server configuration in `.env`:
 
 - `PORT`: Backend server port (default: 5000)
-- `DB_PATH`: SQLite database file path
-- `VIDEOS_DIR`: Directory to store downloaded videos
-- `THUMBNAILS_DIR`: Directory to store video thumbnails
-- `SUBTITLES_DIR`: Directory to store subtitles
+- `DATA_DIR`: Directory to store all data (database, videos, thumbnails, subtitles)
 - `DEFAULT_VIDEO_QUALITY`: Default video quality for downloads
 - `DOWNLOAD_SUBTITLES`: Whether to download subtitles by default
 - `MAX_CONCURRENT_DOWNLOADS`: Maximum number of concurrent downloads

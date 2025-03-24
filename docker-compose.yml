@@ -1,0 +1,19 @@
+services:
+  tube-offline:
+    build: .
+    container_name: tube-offline
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5000}:5000"
+    volumes:
+      - ${DATA_DIR:-./data}:/data
+    environment:
+      - PORT=5000
+      - DB_PATH=/data/tube-offline.db
+      - VIDEOS_DIR=/data/videos
+      - THUMBNAILS_DIR=/data/thumbnails
+      - SUBTITLES_DIR=/data/subtitles
+      - TZ=${TZ:-UTC}
+      - MAX_CONCURRENT_DOWNLOADS=${MAX_CONCURRENT_DOWNLOADS:-3}
+      - DEFAULT_VIDEO_QUALITY=${DEFAULT_VIDEO_QUALITY:-720}
+      - DOWNLOAD_SUBTITLES=${DOWNLOAD_SUBTITLES:-true}

@@ -4,16 +4,16 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { db } from './database.js';
-import { broadcastDownloadComplete } from '../websocket.js';
+import config from '../config.js';
 
 // Get current directory (ES Module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Paths for storing downloaded content
-const videosDir = path.join(__dirname, '..', 'data', 'videos');
-const thumbnailsDir = path.join(__dirname, '..', 'data', 'thumbnails');
-const subtitlesDir = path.join(__dirname, '..', 'data', 'subtitles');
+// Paths for storing downloaded content from config
+const videosDir = config.videosDir;
+const thumbnailsDir = config.thumbnailsDir;
+const subtitlesDir = config.subtitlesDir;
 
 // Ensure directories exist
 [videosDir, thumbnailsDir, subtitlesDir].forEach(dir => {
@@ -209,10 +209,11 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
             subtitleFile = subtitleFileDest;
           }
           
-          // Calculate relative paths for database
-          const relativeVideoPath = path.relative(path.join(__dirname, '..'), videoFile);
-          const relativeThumbnailPath = thumbnailFile ? path.relative(path.join(__dirname, '..'), thumbnailFile) : null;
-          const relativeSubtitlePath = subtitleFile ? path.relative(path.join(__dirname, '..'), subtitleFile) : null;
+          // Store relative paths for database (relative to app root)
+          // For Docker, we can just store the bare filenames since they'll be in known directories
+          const relativeVideoPath = path.relative(path.join(__dirname, '..', '..'), videoFile);
+          const relativeThumbnailPath = thumbnailFile ? path.relative(path.join(__dirname, '..', '..'), thumbnailFile) : null;
+          const relativeSubtitlePath = subtitleFile ? path.relative(path.join(__dirname, '..', '..'), subtitleFile) : null;
           
           const insertVideoStmt = db.prepare(`
             INSERT INTO videos (
@@ -274,26 +275,6 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
               linkTagStmt.run(youtubeId, tag);
             }
           }
-          
-          // Get the video ID from the database for the completion event
-          const getVideoIdStmt = db.prepare(`
-            SELECT id FROM videos WHERE youtube_id = ?
-          `);
-          const dbVideo = getVideoIdStmt.get(youtubeId);
-          
-          // Prepare the completed video data
-          const videoData = {
-            id: dbVideo.id,
-            youtubeId,
-            title: videoInfo.title,
-            channel: videoInfo.channel,
-            thumbnailPath: relativeThumbnailPath,
-            videoPath: relativeVideoPath,
-            duration: videoInfo.duration
-          };
-          
-          // Broadcast download completion event AFTER the video is fully processed
-          broadcastDownloadComplete(youtubeId, videoData);
           
           // Return download result
           resolve({
@@ -398,14 +379,25 @@ async function cancelDownload(youtubeId) {
         updateStmt.run(youtubeId);
         
         // Clean up any partially downloaded files
-        const videoPath = path.join(videosDir, `${youtubeId}.%(ext)s`);
-        const thumbnailPath = path.join(thumbnailsDir, `${youtubeId}.jpg`);
-        const subtitlePath = downloadSubtitles ? path.join(subtitlesDir, `${youtubeId}.en.vtt`) : null;
+        const baseFileName = youtubeId;
         
-        [videoPath, thumbnailPath, subtitlePath].forEach(filePath => {
+        // Find files that start with the youtubeId in the videos directory
+        const videoFiles = fs.readdirSync(videosDir)
+          .filter(file => file.startsWith(baseFileName))
+          .map(file => path.join(videosDir, file));
+          
+        // Find thumbnail files
+        const thumbnailFile = path.join(thumbnailsDir, `${baseFileName}.jpg`);
+        
+        // Find subtitle files
+        const subtitleFile = path.join(subtitlesDir, `${baseFileName}.en.vtt`);
+        
+        // Delete all found files
+        [...videoFiles, thumbnailFile, subtitleFile].forEach(filePath => {
           if (fs.existsSync(filePath)) {
             try {
               fs.unlinkSync(filePath);
+              console.log(`Deleted file: ${filePath}`);
             } catch (error) {
               console.error(`Failed to delete file ${filePath}:`, error);
             }
