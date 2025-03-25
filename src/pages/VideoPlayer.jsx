@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import useKeyboardControls from '../hooks/useKeyboardControls';
+import screenfull from 'screenfull';
 import { useParams, useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactPlayer from 'react-player';
@@ -73,6 +75,12 @@ const VideoPlayer = () => {
   const [playlistIndex, setPlaylistIndex] = useState(-1);
   const [playlistVideos, setPlaylistVideos] = useState([]);
   const [isPlaylistCollapsed, setIsPlaylistCollapsed] = useState(false);
+
+  // Keyboard related states
+  const playerContainerRef = useRef(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [currentVolume, setCurrentVolume] = useState(volume);
+  const [previousVolume, setPreviousVolume] = useState(volume);
   
   const { 
     fetchVideo, 
@@ -87,6 +95,128 @@ const VideoPlayer = () => {
     fetchPlaylist
   } = useLibrary();
   const { success, error } = useNotification();
+
+  // Handle toggling play/pause
+  const handleTogglePlay = () => {
+    setPlaying(!playing);
+  };
+
+  // Handle seeking forward
+  const handleSeekForward = (seconds) => {
+    if (!playerRef.current) return;
+    
+    const player = playerRef.current.getInternalPlayer();
+    if (!player) return;
+    
+    // If seeking to the end (when seconds is Infinity)
+    if (seconds === Infinity) {
+      player.currentTime = player.duration;
+      return;
+    }
+    
+    const newTime = Math.min(player.currentTime + seconds, player.duration);
+    player.currentTime = newTime;
+    
+    // Show a visual feedback for seeking (optional)
+    // This would require adding a seek feedback UI component
+  };
+
+  // Handle seeking backward
+  const handleSeekBackward = (seconds) => {
+    if (!playerRef.current) return;
+    
+    const player = playerRef.current.getInternalPlayer();
+    if (!player) return;
+    
+    // If seeking to the beginning (when seconds is Infinity)
+    if (seconds === Infinity) {
+      player.currentTime = 0;
+      return;
+    }
+    
+    const newTime = Math.max(player.currentTime - seconds, 0);
+    player.currentTime = newTime;
+    
+    // Show a visual feedback for seeking (optional)
+  };
+
+  // Handle increasing volume
+  const handleIncreaseVolume = (amount) => {
+    if (!playerRef.current) return;
+    
+    const newVolume = Math.min(1, volume + amount);
+    setVolume(newVolume);
+    setCurrentVolume(newVolume);
+    localStorage.setItem('videoPlayerVolume', newVolume.toString());
+    
+    // If the video was muted, unmute it
+    if (isMuted) {
+      setIsMuted(false);
+      playerRef.current.getInternalPlayer().muted = false;
+    }
+  };
+
+  // Handle decreasing volume
+  const handleDecreaseVolume = (amount) => {
+    if (!playerRef.current) return;
+    
+    const newVolume = Math.max(0, volume - amount);
+    setVolume(newVolume);
+    setCurrentVolume(newVolume);
+    localStorage.setItem('videoPlayerVolume', newVolume.toString());
+    
+    // If volume is reduced to 0, consider it as muted
+    if (newVolume === 0) {
+      setIsMuted(true);
+      playerRef.current.getInternalPlayer().muted = true;
+    }
+  };
+
+  // Handle toggling mute
+  const handleToggleMute = () => {
+    if (!playerRef.current) return;
+    
+    const player = playerRef.current.getInternalPlayer();
+    if (!player) return;
+    
+    if (isMuted) {
+      // Unmute
+      player.muted = false;
+      setIsMuted(false);
+      if (currentVolume === 0) {
+        // If the volume was 0, restore to previous volume or default
+        const newVolume = previousVolume > 0 ? previousVolume : 0.5;
+        setVolume(newVolume);
+        setCurrentVolume(newVolume);
+        localStorage.setItem('videoPlayerVolume', newVolume.toString());
+      }
+    } else {
+      // Mute
+      player.muted = true;
+      setIsMuted(true);
+      setPreviousVolume(currentVolume);
+    }
+  };
+
+  // Handle toggling fullscreen
+  const handleToggleFullscreen = () => {
+    if (!playerContainerRef.current || !screenfull.isEnabled) return;
+    
+    screenfull.toggle(playerContainerRef.current);
+  };
+
+  // Use the keyboard controls hook
+  useKeyboardControls({
+    playing,
+    togglePlay: handleTogglePlay,
+    seekForward: handleSeekForward,
+    seekBackward: handleSeekBackward,
+    increaseVolume: handleIncreaseVolume,
+    decreaseVolume: handleDecreaseVolume,
+    toggleMute: handleToggleMute,
+    toggleFullscreen: handleToggleFullscreen,
+    isActive: true // Only active on the video player page
+  });
 
   // Handle volume changes and save to localStorage
   const handleVolumeChange = useCallback((event) => {
@@ -486,7 +616,7 @@ const VideoPlayer = () => {
         
         {/* Video Player - Central Piece */}
         <div className="w-full max-w-[90%] lg:max-w-[85%] xl:max-w-[80%] my-4">
-          <div className="aspect-video w-full rounded-lg overflow-hidden shadow-2xl bg-secondary/30 relative">
+          <div className="aspect-video w-full rounded-lg overflow-hidden shadow-2xl bg-secondary/30 relative" ref={playerContainerRef}>
             <ReactPlayer
               ref={playerRef}
               url={video.video_url}
@@ -494,6 +624,7 @@ const VideoPlayer = () => {
               height="100%"
               playing={playing}
               volume={volume}
+              muted={isMuted}
               onStart={handleVideoStart}
               onProgress={handleProgress}
               onDuration={handleDuration}

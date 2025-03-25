@@ -20,11 +20,39 @@ import Favorites from './pages/Favorites';
 import { NotificationProvider } from './context/NotificationContext';
 import { LibraryProvider } from './context/LibraryContext';
 import { DownloadProvider } from './context/DownloadContext';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Components
 import NotificationToast from './components/ui/NotificationToast';
 import ScrollToTop from './components/ui/ScrollToTop';
 import LibraryRefreshPoller from './components/ui/LibraryRefreshPoller';
+import KeyboardControlsHelp from './components/ui/KeyboardControlsHelp';
+
+// Hooks
+import useKeyboardControls from './hooks/useKeyboardControls';
+
+// CSS for theme support
+import './theme.css';
+
+// App-level keyboard controls (non-video specific)
+function GlobalKeyboardControls() {
+  // We're just setting up global keyboard shortcuts here
+  // The actual shortcut definitions are in the useKeyboardControls hook
+  useKeyboardControls({
+    isActive: true,
+    // These are placeholders since we're not controlling a video
+    playing: false,
+    togglePlay: () => {},
+    seekForward: () => {},
+    seekBackward: () => {},
+    increaseVolume: () => {},
+    decreaseVolume: () => {},
+    toggleMute: () => {},
+    toggleFullscreen: () => {},
+  });
+  
+  return null;
+}
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -72,40 +100,44 @@ function App() {
   }
 
   return (
-    <Router>
-      <NotificationProvider>
-        <LibraryProvider>
-          <DownloadProvider>
-            <div className="flex flex-col h-screen bg-primary text-text-primary">
-              <Header />
-              
-              <div className="flex flex-1 overflow-hidden">
-                <Sidebar isOpen={isSidebarOpen} />
+    <ThemeProvider>
+      <Router>
+        <NotificationProvider>
+          <LibraryProvider>
+            <DownloadProvider>
+              <div className="flex flex-col h-screen bg-primary text-text-primary">
+                <Header />
                 
-                <main className="flex-1 overflow-y-auto pt-header">
-                  <AnimatePresence mode="wait">
-                    <Routes>
-                      <Route path="/" element={<Home />} />
-                      <Route path="/video/:id" element={<VideoPlayer />} />
-                      <Route path="/downloads" element={<Downloads />} />
-                      <Route path="/playlists" element={<Playlists />} />
-                      <Route path="/playlist/:id" element={<PlaylistDetail />} />
-                      <Route path="/tags" element={<Tags />} />
-                      <Route path="/search" element={<SearchResults />} />
-                      <Route path="/favorites" element={<Favorites />} />
-                    </Routes>
-                  </AnimatePresence>
-                </main>
+                <div className="flex flex-1 overflow-hidden">
+                  <Sidebar isOpen={isSidebarOpen} />
+                  
+                  <main className="flex-1 overflow-y-auto pt-header">
+                    <AnimatePresence mode="wait">
+                      <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/video/:id" element={<VideoPlayer />} />
+                        <Route path="/downloads" element={<Downloads />} />
+                        <Route path="/playlists" element={<Playlists />} />
+                        <Route path="/playlist/:id" element={<PlaylistDetail />} />
+                        <Route path="/tags" element={<Tags />} />
+                        <Route path="/search" element={<SearchResults />} />
+                        <Route path="/favorites" element={<Favorites />} />
+                      </Routes>
+                    </AnimatePresence>
+                  </main>
+                </div>
+                
+                <NotificationToast />
+                <ScrollToTop />
+                <LibraryRefreshPoller />
+                <KeyboardControlsHelp />
+                <GlobalKeyboardControls />
               </div>
-              
-              <NotificationToast />
-              <ScrollToTop />
-              <LibraryRefreshPoller />
-            </div>
-          </DownloadProvider>
-        </LibraryProvider>
-      </NotificationProvider>
-    </Router>
+            </DownloadProvider>
+          </LibraryProvider>
+        </NotificationProvider>
+      </Router>
+    </ThemeProvider>
   );
 }
 

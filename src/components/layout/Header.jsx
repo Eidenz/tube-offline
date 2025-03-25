@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/solid';
 import DownloadModal from '../downloads/DownloadModal';
+import ThemeSwitch from '../ui/ThemeSwitch';
 
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,6 +47,16 @@ const Header = () => {
     }
   };
 
+  // Function to toggle keyboard help overlay visibility
+  const showKeyboardHelp = () => {
+    // Simulate pressing the '?' key to show keyboard help
+    const event = new KeyboardEvent('keydown', {
+      key: '?',
+      bubbles: true
+    });
+    document.dispatchEvent(event);
+  };
+
   return (
     <header 
       className={`h-header fixed top-0 left-0 w-full flex items-center justify-between px-6 z-40 transition-all duration-300 ${
@@ -78,16 +89,33 @@ const Header = () => {
         </div>
       </form>
       
-      {/* Download button */}
-      <motion.button
-        className="relative flex items-center justify-center w-10 h-10 bg-accent/80 backdrop-blur-sm text-white rounded-full"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setIsDownloadModalOpen(true)}
-        aria-label="Download video"
-      >
-        <ArrowDownTrayIcon className="w-5 h-5" />
-      </motion.button>
+      {/* Header action buttons */}
+      <div className="flex items-center gap-3">
+        {/* Theme switch button */}
+        <ThemeSwitch />
+        
+        {/* Keyboard help button */}
+        <motion.button
+          className="relative flex items-center justify-center w-10 h-10 bg-primary/80 backdrop-blur-sm rounded-full"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={showKeyboardHelp}
+          aria-label="Show keyboard shortcuts"
+        >
+          <QuestionMarkCircleIcon className="w-5 h-5" />
+        </motion.button>
+        
+        {/* Download button */}
+        <motion.button
+          className="relative flex items-center justify-center w-10 h-10 bg-accent/80 backdrop-blur-sm text-white rounded-full"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsDownloadModalOpen(true)}
+          aria-label="Download video"
+        >
+          <ArrowDownTrayIcon className="w-5 h-5" />
+        </motion.button>
+      </div>
       
       {/* Download Modal */}
       {isDownloadModalOpen && (
