@@ -16,6 +16,7 @@ import { FilmIcon as FilmIconSolid,
   TagIcon as TagIconSolid,
   HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
 import { useDownload } from '../../context/DownloadContext';
+import { useLibrary } from '../../context/LibraryContext';
 
 // Memoized NavItem component to prevent unnecessary re-renders
 const NavItem = memo(({ to, icon, activeIcon, label, badge = null, isCollapsed }) => (
@@ -70,6 +71,7 @@ const Sidebar = ({ isOpen }) => {
     const savedState = localStorage.getItem('sidebarCollapsed');
     return savedState !== null ? JSON.parse(savedState) : false;
   });
+  const { videos, tags } = useLibrary();
   
   // Create a separate effect for monitoring active downloads
   // This will run outside the render cycle
@@ -192,7 +194,10 @@ const Sidebar = ({ isOpen }) => {
             {/* Bottom section with version info */}
             {!isCollapsed && (
               <div className="pt-4 pb-6 px-6 text-xs text-text-secondary/50 border-t border-[#3f3f3f]/30">
-                <p>TubeOffline v1</p>
+                <p className="mb-2">
+                  {videos.length || 0} videos • {tags.length || 0} tags
+                </p>
+                <p>TubeOffline v1.2</p>
               </div>
             )}
           </div>

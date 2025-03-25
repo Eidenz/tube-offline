@@ -229,7 +229,7 @@ const VideoCard = ({ video, isDownloading = false, progress = 0 }) => {
         </div>
         
         <div className="video-info">
-          <h3 className="video-title">{title}</h3>
+          <h3 className="video-title" style={{height: '50px'}}>{title}</h3>
           
           <div className="video-meta flex justify-between items-center text-text-secondary text-sm">
             <span>{channel}</span>

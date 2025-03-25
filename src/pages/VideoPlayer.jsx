@@ -635,10 +635,14 @@ const VideoPlayer = () => {
             <div>
               <h3 className="font-medium text-lg">{video.channel}</h3>
               <div className="flex flex-wrap gap-2 text-sm text-text-secondary">
-                {video.view_count && <span>{video.view_count} views</span>}
+                {video.view_count !== undefined && (
+                  <span>
+                    {parseInt(video.view_count) === 0 ? '0 views' : `${video.view_count} ${parseInt(video.view_count) === 1 ? 'view' : 'views'}`}
+                  </span>
+                )}
                 {video.metadata && (
                   <>
-                    {video.view_count && <span className="text-text-secondary/50">•</span>}
+                    {video.view_count !== undefined && <span className="text-text-secondary/50">•</span>}
                     <VideoQualityBadge metadata={video.metadata} />
                   </>
                 )}
