@@ -57,7 +57,6 @@ const Home = () => {
         }
       } else {
         // For specific tag, search with that tag
-        setIsLoading(true);
         try {
           const result = await searchVideos(selectedCategory, 'tag', Math.max(20, displayCount), 0);
           if (result && result.videos) {
@@ -68,8 +67,6 @@ const Home = () => {
         } catch (err) {
           console.error('Failed to filter by tag:', err);
           setFilteredVideos([]);
-        } finally {
-          setIsLoading(false);
         }
       }
     };
