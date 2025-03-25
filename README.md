@@ -6,6 +6,17 @@ An elegant offline YouTube video library using YT-DLP with a React frontend and 
 
 ![image](https://github.com/user-attachments/assets/7f216eae-9eef-4d4b-9733-a538e5857710)
 
+## Table of Contents
+- [Disclaimer](#-disclaimer--ai-generated-project-warning)
+- [Features](#features)
+- [Running with Docker](#running-with-docker-recommended)
+- [Manual Installation](#manual-installation)
+- [Production Build](#production-build)
+- [Configuration](#configuration)
+- [Updating](#updating)
+- [System Requirements](#system-requirements)
+- [Tech Stack](#tech-stack)
+- [License](#license)
 
 ## ⚠️ Disclaimer / AI-Generated Project Warning
 
@@ -127,6 +138,39 @@ You can modify the server configuration in `.env`:
 - `DEFAULT_VIDEO_QUALITY`: Default video quality for downloads
 - `DOWNLOAD_SUBTITLES`: Whether to download subtitles by default
 - `MAX_CONCURRENT_DOWNLOADS`: Maximum number of concurrent downloads
+
+## Updating
+
+### Docker Method (Recommended)
+
+To update TubeOffline to the latest version:
+
+```bash
+./tubeoffline.sh update
+```
+
+This will automatically:
+1. Pull the latest code from the repository
+2. Rebuild the Docker container
+3. Restart the application with the updated version
+
+### Manual Update
+
+If you're running the application manually:
+
+```bash
+# Pull the latest changes
+git pull
+
+# Install any new dependencies
+npm install
+
+# Rebuild the application
+npm run build
+
+# Restart the server
+npm start
+```
 
 ## Tech Stack
 

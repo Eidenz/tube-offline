@@ -66,10 +66,8 @@ const PlaylistDetail = () => {
     // Make the API call to update the order
     try {
       await reorderPlaylistVideos(playlist.id, videoIds);
-      success('Playlist order updated');
     } catch (err) {
       console.error('Failed to reorder playlist:', err);
-      error('Failed to update playlist order');
       
       // If the API call fails, revert back to the original order
       const data = await fetchPlaylist(id);
