@@ -61,7 +61,7 @@ const CategoryPills = ({ categories, activeCategory, onChange }) => {
         {categories.map((category, index) => (
           <motion.button
             key={index}
-            className={`category-pill flex-shrink-0 ${category.value === activeCategory ? 'active' : ''}`}
+            className={`category-pill ${category.value === activeCategory ? 'active' : ''}`}
             onClick={() => onChange(category.value)}
             whileTap={{ scale: 0.95 }}
             whileHover={{ scale: 1.05 }}

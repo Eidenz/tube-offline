@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -13,16 +13,30 @@ const Header = () => {
 
   // Track scroll position
   useEffect(() => {
+    // Attach the scroll event to the main content element
+    const mainContent = document.querySelector('main');
+    
+    if (!mainContent) return;
+    
     const handleScroll = () => {
-      if (window.scrollY > 10) {
+      if (mainContent.scrollTop > 10) {
         setIsScrolled(true);
       } else {
         setIsScrolled(false);
       }
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    // Add the event listener to the main content
+    mainContent.addEventListener('scroll', handleScroll);
+    
+    // Run once to check initial state
+    handleScroll();
+    
+    return () => {
+      if (mainContent) {
+        mainContent.removeEventListener('scroll', handleScroll);
+      }
+    };
   }, []);
 
   const handleSubmit = (e) => {
@@ -34,7 +48,7 @@ const Header = () => {
 
   return (
     <header 
-      className={`h-header fixed top-0 left-0 w-full flex items-center justify-between px-6 z-40 transition-colors duration-300 ${
+      className={`h-header fixed top-0 left-0 w-full flex items-center justify-between px-6 z-40 transition-all duration-300 ${
         isScrolled ? 'bg-secondary/95 backdrop-blur-sm shadow-header' : 'bg-transparent'
       }`}
     >

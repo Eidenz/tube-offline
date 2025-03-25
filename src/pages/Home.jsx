@@ -45,32 +45,39 @@ const Home = () => {
   // Load videos when category changes or on initial load
   useEffect(() => {
     const filterByTag = async () => {
-      if (selectedCategory === 'all') {
-        // For all category, fetch initial videos with a limit of at least displayCount
-        try {
+      setIsLoading(true);
+      try {
+        if (selectedCategory === 'all') {
+          // For "all" category, just fetch videos directly
           const result = await fetchVideos(Math.max(20, displayCount), 0);
-          if (result && result.videos) {
-            setFilteredVideos(result.videos);
-          }
-        } catch (err) {
-          console.error('Failed to fetch videos:', err);
-        }
-      } else {
-        // For specific tag, search with that tag
-        setIsLoading(true);
-        try {
-          const result = await searchVideos(selectedCategory, 'tag', Math.max(20, displayCount), 0);
           if (result && result.videos) {
             setFilteredVideos(result.videos);
           } else {
             setFilteredVideos([]);
           }
-        } catch (err) {
-          console.error('Failed to filter by tag:', err);
-          setFilteredVideos([]);
-        } finally {
-          setIsLoading(false);
+        } else {
+          // For specific tag, use the search API
+          console.log("Searching by tag:", selectedCategory);
+          const result = await searchVideos(
+            selectedCategory, 
+            'tag',
+            Math.max(20, displayCount), 
+            0
+          );
+          
+          console.log("Search results:", result);
+          
+          if (result && result.videos) {
+            setFilteredVideos(result.videos);
+          } else {
+            setFilteredVideos([]);
+          }
         }
+      } catch (err) {
+        console.error('Failed to filter by tag:', err);
+        setFilteredVideos([]);
+      } finally {
+        setIsLoading(false);
       }
     };
     
