@@ -233,13 +233,13 @@ const Playlists = () => {
         </div>
         
         <motion.button
-          className="btn btn-primary"
+          className="btn btn-primary flex items-center"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsCreateModalOpen(true)}
         >
           <PlusIcon className="w-5 h-5 mr-2" />
-          Create Playlist
+          <span>Create Playlist</span>
         </motion.button>
       </div>
       
