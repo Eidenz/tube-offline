@@ -6,7 +6,10 @@ RUN apk add --no-cache python3 py3-pip ffmpeg curl tzdata && \
     python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir yt-dlp && \
     # Create a symlink to make yt-dlp accessible in PATH
-    ln -s /opt/venv/bin/yt-dlp /usr/local/bin/yt-dlp
+    ln -s /opt/venv/bin/yt-dlp /usr/local/bin/yt-dlp && \
+    # Ensure the update permissions are set correctly
+    chmod 777 /opt/venv/bin/pip && \
+    chmod 777 /usr/local/bin/yt-dlp
 
 # Create app directory
 WORKDIR /app
@@ -42,7 +45,8 @@ VOLUME ["/data"]
 
 # Create and set permissions for data subdirectories
 RUN mkdir -p /data/videos /data/thumbnails /data/subtitles && \
-    chown -R node:node /data
+    chown -R node:node /data && \
+    chmod -R 755 /data
 
 # Use node user for security
 USER node

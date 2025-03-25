@@ -25,6 +25,265 @@ const subtitlesDir = config.subtitlesDir;
 });
 
 /**
+ * Get the current installed version of yt-dlp
+ * @returns {Promise<string|null>} Current version or null if not installed
+ */
+function getYtDlpVersion() {
+  return new Promise((resolve) => {
+    const ytDlp = spawn('yt-dlp', ['--version']);
+    
+    let stdout = '';
+    ytDlp.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    ytDlp.on('error', () => {
+      resolve(null);
+    });
+    
+    ytDlp.on('close', (code) => {
+      if (code === 0) {
+        resolve(stdout.trim());
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+/**
+ * Check if yt-dlp needs updating
+ * @returns {Promise<boolean>} Whether yt-dlp needs updating
+ */
+function checkYtDlpUpdate() {
+  return new Promise((resolve) => {
+    console.log('Checking if yt-dlp needs updating...');
+    
+    const updateCheck = spawn('yt-dlp', ['-U', '--no-update']);
+    
+    let output = '';
+    updateCheck.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    updateCheck.stderr.on('data', (data) => {
+      output += data.toString();
+    });
+    
+    updateCheck.on('error', (err) => {
+      console.error('Failed to check for yt-dlp updates:', err);
+      resolve(false);
+    });
+    
+    updateCheck.on('close', (code) => {
+      const needsUpdate = output.includes('New version available') || 
+                          output.includes('You can update using');
+      console.log(`yt-dlp ${needsUpdate ? 'needs updating' : 'is up to date'}`);
+      resolve(needsUpdate);
+    });
+  });
+}
+
+/**
+ * Update yt-dlp to the latest version
+ * @returns {Promise<boolean>} Whether the update was successful
+ */
+function updateYtDlp() {
+  return new Promise((resolve) => {
+    console.log('Attempting to update yt-dlp...');
+    
+    // Check if we're in the Docker container with venv
+    const inDocker = fs.existsSync('/opt/venv/bin/pip');
+    
+    let updateCommand;
+    if (inDocker) {
+      // In Docker, try to update using the venv pip
+      updateCommand = spawn('/opt/venv/bin/pip', ['install', '--upgrade', 'yt-dlp']);
+    } else {
+      // Otherwise use yt-dlp's self-update feature
+      updateCommand = spawn('yt-dlp', ['-U']);
+    }
+    
+    let output = '';
+    updateCommand.stdout.on('data', (data) => {
+      const chunk = data.toString();
+      output += chunk;
+      console.log(`yt-dlp update: ${chunk}`);
+    });
+    
+    updateCommand.stderr.on('data', (data) => {
+      const chunk = data.toString();
+      output += chunk;
+      console.error(`yt-dlp update error: ${chunk}`);
+    });
+    
+    updateCommand.on('error', (err) => {
+      console.error('Failed to update yt-dlp:', err);
+      resolve(false);
+    });
+    
+    updateCommand.on('close', (code) => {
+      if (code === 0) {
+        // Check for specific messages that indicate success
+        const updateSuccess = output.includes('Updated yt-dlp') || 
+                             output.includes('Successfully installed') ||
+                             output.includes('already up to date');
+        
+        if (updateSuccess) {
+          console.log('yt-dlp successfully updated');
+          resolve(true);
+        } else {
+          console.log('yt-dlp update command ran, but update status unclear');
+          resolve(true); // Optimistically assume it worked
+        }
+      } else {
+        console.error(`yt-dlp update failed with code ${code}`);
+        console.log('Trying alternate update method...');
+        
+        // Try the alternate method
+        const altCommand = inDocker 
+          ? spawn('yt-dlp', ['-U']) 
+          : spawn('pip3', ['install', '--upgrade', 'yt-dlp']);
+        
+        altCommand.stdout.on('data', (data) => {
+          console.log(`Alternate update: ${data.toString()}`);
+        });
+        
+        altCommand.stderr.on('data', (data) => {
+          console.error(`Alternate update error: ${data.toString()}`);
+        });
+        
+        altCommand.on('error', () => {
+          console.error('Alternate update method failed');
+          resolve(false);
+        });
+        
+        altCommand.on('close', (altCode) => {
+          if (altCode === 0) {
+            console.log('yt-dlp successfully updated using alternate method');
+            resolve(true);
+          } else {
+            console.error('All update methods failed');
+            console.log('Current yt-dlp version will be used');
+            resolve(false);
+          }
+        });
+      }
+    });
+  });
+}
+
+/**
+ * Download and install yt-dlp if not present
+ * @returns {Promise<boolean>} Whether the installation was successful
+ */
+function installYtDlp() {
+  return new Promise((resolve) => {
+    console.log('Attempting to install yt-dlp...');
+    
+    // Check if we're in the Docker container
+    const inDocker = fs.existsSync('/opt/venv');
+    
+    let installCommand;
+    if (inDocker) {
+      // In Docker, use the virtual environment pip
+      installCommand = spawn('/opt/venv/bin/pip', ['install', 'yt-dlp']);
+    } else {
+      // For non-Docker, use appropriate installation method based on platform
+      const platform = process.platform;
+      if (platform === 'linux') {
+        // For Linux, try using pip3
+        installCommand = spawn('pip3', ['install', 'yt-dlp']);
+      } else if (platform === 'darwin') {
+        // For macOS, try using Homebrew
+        installCommand = spawn('brew', ['install', 'yt-dlp']);
+      } else if (platform === 'win32') {
+        // For Windows, download the binary directly
+        const winDir = process.env.APPDATA || process.env.USERPROFILE;
+        installCommand = spawn('curl', [
+          '-L', 
+          'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe',
+          '-o', 
+          `${winDir}\\yt-dlp.exe`
+        ]);
+      } else {
+        console.error('Unsupported platform for automatic installation');
+        console.error('Please install yt-dlp manually: https://github.com/yt-dlp/yt-dlp/wiki/Installation');
+        resolve(false);
+        return;
+      }
+    }
+    
+    installCommand.stdout.on('data', (data) => {
+      console.log(`yt-dlp install: ${data.toString()}`);
+    });
+    
+    installCommand.stderr.on('data', (data) => {
+      console.error(`yt-dlp install error: ${data.toString()}`);
+    });
+    
+    installCommand.on('error', (err) => {
+      console.error('Failed to install yt-dlp:', err);
+      console.error('Please install yt-dlp manually: https://github.com/yt-dlp/yt-dlp/wiki/Installation');
+      resolve(false);
+    });
+    
+    installCommand.on('close', (code) => {
+      if (code === 0) {
+        console.log('yt-dlp successfully installed');
+        resolve(true);
+      } else {
+        console.error(`yt-dlp installation failed with code ${code}`);
+        console.error('Please install yt-dlp manually: https://github.com/yt-dlp/yt-dlp/wiki/Installation');
+        resolve(false);
+      }
+    });
+  });
+}
+
+/**
+ * Ensure yt-dlp is installed and up to date
+ * @returns {Promise<boolean>} Whether yt-dlp is ready to use
+ */
+async function ensureYtDlpReady() {
+  console.log('Checking yt-dlp installation...');
+  const isInstalled = await checkYtDlpInstalled();
+  
+  if (!isInstalled) {
+    console.log('yt-dlp is not installed. Attempting to install...');
+    const installed = await installYtDlp();
+    if (!installed) {
+      console.error('Failed to install yt-dlp');
+      return false;
+    }
+    console.log('yt-dlp successfully installed');
+    return true;
+  }
+  
+  // Get current version for logging
+  const currentVersion = await getYtDlpVersion();
+  console.log(`Current yt-dlp version: ${currentVersion}`);
+  
+  console.log('Checking for updates...');
+  const needsUpdate = await checkYtDlpUpdate();
+  
+  if (needsUpdate) {
+    console.log('Updating yt-dlp...');
+    const updated = await updateYtDlp();
+    if (!updated) {
+      console.warn('Failed to update yt-dlp, but current version will be used');
+    } else {
+      const newVersion = await getYtDlpVersion();
+      console.log(`yt-dlp updated to version: ${newVersion}`);
+    }
+  } else {
+    console.log('yt-dlp is up to date');
+  }
+  
+  return true;
+}
+
+/**
  * Get video information using yt-dlp
  * @param {string} url YouTube URL
  * @returns {Promise<Object>} Video information
@@ -471,5 +730,6 @@ export {
   cancelDownload,
   getActiveDownloads,
   getDownloadHistory,
-  checkYtDlpInstalled
+  checkYtDlpInstalled,
+  ensureYtDlpReady
 };

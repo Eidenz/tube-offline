@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { initializeDatabase } from './config/database.js';
 import { initializeWebSocketServer } from './websocket.js';
-import { checkYtDlpInstalled } from './config/yt-dlp.js';
+import { ensureYtDlpReady } from './config/yt-dlp.js';
 import config from './config.js';
 
 // Import routes
@@ -71,15 +71,20 @@ if (process.env.NODE_ENV === 'production') {
 // Initialize WebSocket server
 const wss = initializeWebSocketServer(server);
 
-// Check if yt-dlp is installed
-checkYtDlpInstalled().then(installed => {
-  if (!installed) {
-    console.warn('WARNING: yt-dlp is not installed or not found in PATH. Download functionality will not work.');
-    console.warn('Please install yt-dlp: https://github.com/yt-dlp/yt-dlp/wiki/Installation');
-  } else {
-    console.log('yt-dlp is installed and ready to use');
-  }
-});
+// Check and update yt-dlp if needed
+ensureYtDlpReady()
+  .then(ready => {
+    if (ready) {
+      console.log('yt-dlp is ready for use');
+    } else {
+      console.warn('WARNING: yt-dlp is not properly set up. Download functionality may be limited.');
+      console.warn('Please install yt-dlp manually: https://github.com/yt-dlp/yt-dlp/wiki/Installation');
+    }
+  })
+  .catch(err => {
+    console.error('Error checking yt-dlp:', err);
+    console.warn('WARNING: Will attempt to continue with existing yt-dlp if available');
+  });
 
 // Initialize database
 initializeDatabase()
