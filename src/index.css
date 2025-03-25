@@ -90,7 +90,7 @@
   }
   
   .category-pill {
-    @apply bg-secondary px-4 py-2 rounded-full whitespace-nowrap cursor-pointer transition-all duration-300 hover:bg-hover;
+    @apply bg-secondary px-3 py-1.5 md:px-4 md:py-2 rounded-full whitespace-nowrap cursor-pointer transition-all duration-300 hover:bg-hover text-sm md:text-base flex-shrink-0;
   }
   
   .category-pill.active {

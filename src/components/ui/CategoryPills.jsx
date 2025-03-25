@@ -41,21 +41,23 @@ const CategoryPills = ({ categories, activeCategory, onChange }) => {
   
   return (
     <div className="relative">
-      {/* Left scroll button */}
+      {/* Left scroll button - now only shown on larger screens */}
       {showLeftArrow && (
-        <button 
-          className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-secondary/90 rounded-full p-1 shadow-md"
-          onClick={scrollLeft}
-          aria-label="Scroll left"
-        >
-          <ChevronLeftIcon className="h-5 w-5" />
-        </button>
+        <div className="hidden md:block">
+          <button 
+            className="absolute left-0 top-1/2 transform -translate-y-1/2 z-10 bg-secondary/90 rounded-full p-1 shadow-md"
+            onClick={scrollLeft}
+            aria-label="Scroll left"
+          >
+            <ChevronLeftIcon className="h-5 w-5" />
+          </button>
+        </div>
       )}
       
-      {/* Horizontal scrollable container */}
+      {/* Container - now with flex-wrap for small screens */}
       <div 
         ref={containerRef}
-        className="flex overflow-x-auto gap-3 py-2 pb-3 no-scrollbar"
+        className="flex flex-wrap overflow-y-auto max-w-full gap-3 py-2 pb-3 md:overflow-x-auto md:overflow-y-hidden md:no-scrollbar"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {categories.map((category, index) => (
@@ -72,15 +74,17 @@ const CategoryPills = ({ categories, activeCategory, onChange }) => {
         ))}
       </div>
       
-      {/* Right scroll button */}
+      {/* Right scroll button - now only shown on larger screens */}
       {showRightArrow && (
-        <button 
-          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-secondary/90 rounded-full p-1 shadow-md"
-          onClick={scrollRight}
-          aria-label="Scroll right"
-        >
-          <ChevronRightIcon className="h-5 w-5" />
-        </button>
+        <div className="hidden md:block">
+          <button 
+            className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-secondary/90 rounded-full p-1 shadow-md"
+            onClick={scrollRight}
+            aria-label="Scroll right"
+          >
+            <ChevronRightIcon className="h-5 w-5" />
+          </button>
+        </div>
       )}
     </div>
   );

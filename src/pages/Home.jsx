@@ -1,11 +1,25 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FilmIcon } from '@heroicons/react/24/outline';
 import { useLibrary } from '../context/LibraryContext';
 import VideoCard from '../components/video/VideoCard';
 import CategoryPills from '../components/ui/CategoryPills';
 
+const DiceIcon = ({ className }) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 512 512" 
+    className={className}
+  >
+    <path d="M255.76 44.764c-6.176 0-12.353 1.384-17.137 4.152L85.87 137.276c-9.57 5.536-9.57 14.29 0 19.826l152.753 88.36c9.57 5.536 24.703 5.536 34.272 0l152.753-88.36c9.57-5.535 9.57-14.29 0-19.825l-152.753-88.36c-4.785-2.77-10.96-4.153-17.135-4.153zm.926 82.855a31.953 18.96 0 0 1 22.127 32.362 31.953 18.96 0 1 1-45.188-26.812 31.953 18.96 0 0 1 23.06-5.55zM75.67 173.84c-5.753-.155-9.664 4.336-9.664 12.28v157.696c0 11.052 7.57 24.163 17.14 29.69l146.93 84.848c9.57 5.526 17.14 1.156 17.14-9.895V290.76c0-11.052-7.57-24.16-17.14-29.688l-146.93-84.847c-2.69-1.555-5.225-2.327-7.476-2.387zm360.773.002c-2.25.06-4.783.83-7.474 2.385l-146.935 84.847c-9.57 5.527-17.14 18.638-17.14 29.69v157.7c0 11.05 7.57 15.418 17.14 9.89L428.97 373.51c9.57-5.527 17.137-18.636 17.137-29.688v-157.7c0-7.942-3.91-12.432-9.664-12.278zM89.297 195.77a31.236 18.008 58.094 0 1 33.818 41.183 31.236 18.008 58.094 1 1-45-25.98 31.236 18.008 58.094 0 1 11.182-15.203zm221.52 64.664A18.008 31.236 31.906 0 1 322 275.637a18.008 31.236 31.906 0 1-45 25.98 18.008 31.236 31.906 0 1 33.818-41.183zM145.296 289.1a31.236 18.008 58.094 0 1 33.818 41.183 31.236 18.008 58.094 0 1-45-25.98 31.236 18.008 58.094 0 1 11.182-15.203zm277.523 29.38A18.008 31.236 31.906 0 1 434 333.684a18.008 31.236 31.906 0 1-45 25.98 18.008 31.236 31.906 0 1 33.818-41.184zm-221.52 64.663a31.236 18.008 58.094 0 1 33.817 41.183 31.236 18.008 58.094 1 1-45-25.98 31.236 18.008 58.094 0 1 11.182-15.203z" 
+    fill="currentColor" 
+    />
+  </svg>
+);
+
 const Home = () => {
+  const navigate = useNavigate();
   const { videos, fetchVideos, pagination, isLoading, searchVideos, getTopTags } = useLibrary();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [filteredVideos, setFilteredVideos] = useState([]);
@@ -79,6 +93,17 @@ const Home = () => {
     setSelectedCategory(category);
     // Reset display count when category changes
     setDisplayCount(20);
+  };
+
+  const handleRandomVideo = () => {
+    if (videos.length === 0) return;
+    
+    // Select a random video from all available videos
+    const randomIndex = Math.floor(Math.random() * videos.length);
+    const randomVideo = videos[randomIndex];
+    
+    // Navigate to the video player page
+    navigate(`/video/${randomVideo.id}`);
   };
   
   // Handle load more button click
@@ -166,17 +191,33 @@ const Home = () => {
         </div>
         
         <div className="mb-6">
-          {isLoadingTags ? (
-            <div className="h-12 flex items-center">
-              <div className="animate-pulse w-64 h-8 bg-secondary/50 rounded-full"></div>
+          <div className="flex flex-wrap items-center justify-between gap-3 w-full">
+            {/* Category Pills Container - improved for better responsiveness */}
+            <div className="flex-grow overflow-hidden max-w-[calc(100%-60px)]">
+              {isLoadingTags ? (
+                <div className="h-12 flex items-center">
+                  <div className="animate-pulse w-64 h-8 bg-secondary/50 rounded-full"></div>
+                </div>
+              ) : (
+                <CategoryPills
+                  categories={topTags}
+                  activeCategory={selectedCategory}
+                  onChange={handleCategoryChange}
+                />
+              )}
             </div>
-          ) : (
-            <CategoryPills
-              categories={topTags}
-              activeCategory={selectedCategory}
-              onChange={handleCategoryChange}
-            />
-          )}
+            
+            {/* Random Video Button */}
+            <motion.button
+              className="flex-shrink-0 flex items-center justify-center w-10 h-10 ml-3 bg-secondary rounded-full hover:bg-accent/20 hover:text-accent transition-colors"
+              whileHover={{ rotate: 180, scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={handleRandomVideo}
+              title="Play a random video"
+            >
+              <DiceIcon className="w-5 h-5" />
+            </motion.button>
+          </div>
         </div>
         
         {isLoading && visibleVideos.length === 0 ? (
