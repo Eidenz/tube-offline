@@ -63,6 +63,51 @@ function broadcastDownloadComplete(youtubeId, videoData) {
     return;
   }
   
+  // First, check for any pending playlist additions for this video
+  try {
+    const pendingAdditions = JSON.parse(localStorage.getItem('pendingPlaylistAdditions') || '[]');
+    
+    // Find any matching entries for this YouTube ID
+    const matchingAdditions = pendingAdditions.filter(entry => entry.youtubeId === youtubeId);
+    
+    if (matchingAdditions.length > 0) {
+      console.log(`Found ${matchingAdditions.length} pending playlist additions for ${youtubeId}`);
+      
+      // Process each addition
+      matchingAdditions.forEach(async (addition) => {
+        try {
+          // Find the video ID from the database using YouTube ID
+          const db = require('./config/database.js').db;
+          const stmt = db.prepare('SELECT id FROM videos WHERE youtube_id = ?');
+          const video = stmt.get(youtubeId);
+          
+          if (video && video.id) {
+            // Add to the playlist
+            const addStmt = db.prepare(`
+              INSERT OR IGNORE INTO playlist_videos (playlist_id, video_id, position)
+              VALUES (?, ?, (
+                SELECT COALESCE(MAX(position), 0) + 1
+                FROM playlist_videos
+                WHERE playlist_id = ?
+              ))
+            `);
+            
+            addStmt.run(addition.playlistId, video.id, addition.playlistId);
+            console.log(`Added video ${youtubeId} to playlist ${addition.playlistId}`);
+          }
+        } catch (err) {
+          console.error(`Error adding downloaded video to playlist: ${err.message}`);
+        }
+      });
+      
+      // Remove the processed entries
+      const remainingAdditions = pendingAdditions.filter(entry => entry.youtubeId !== youtubeId);
+      localStorage.setItem('pendingPlaylistAdditions', JSON.stringify(remainingAdditions));
+    }
+  } catch (err) {
+    console.error('Error processing pending playlist additions:', err);
+  }
+  
   const message = JSON.stringify({
     type: 'download_completed',
     youtubeId,

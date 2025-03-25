@@ -338,6 +338,13 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
       const videoInfo = await getVideoInfo(url);
       const youtubeId = videoInfo.id;
       
+      // Get any playlist target from the downloads table
+      const downloadInfoStmt = db.prepare(`
+        SELECT playlist_target_id FROM downloads WHERE youtube_id = ?
+      `);
+      const downloadInfo = downloadInfoStmt.get(youtubeId);
+      const playlistTargetId = downloadInfo?.playlist_target_id || null;
+      
       // Update download status in database
       const downloadStmt = db.prepare(`
         INSERT INTO downloads (youtube_id, url, title, status, quality, download_subtitles)
@@ -546,6 +553,31 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
             subtitlePath: relativeSubtitlePath,
             duration: videoInfo.duration
           };
+
+          if (playlistTargetId) {
+            try {
+              // Get the video ID from the database
+              const videoStmt = db.prepare('SELECT id FROM videos WHERE youtube_id = ?');
+              const dbVideo = videoStmt.get(youtubeId);
+              
+              if (dbVideo) {
+                // Add to playlist
+                const addToPlaylistStmt = db.prepare(`
+                  INSERT OR IGNORE INTO playlist_videos (playlist_id, video_id, position)
+                  VALUES (?, ?, (
+                    SELECT COALESCE(MAX(position), 0) + 1
+                    FROM playlist_videos
+                    WHERE playlist_id = ?
+                  ))
+                `);
+                
+                addToPlaylistStmt.run(playlistTargetId, dbVideo.id, playlistTargetId);
+                console.log(`Added video ${youtubeId} to playlist ${playlistTargetId}`);
+              }
+            } catch (err) {
+              console.error(`Error adding video to playlist: ${err.message}`);
+            }
+          }
 
           broadcastDownloadComplete(youtubeId, videoData);
           

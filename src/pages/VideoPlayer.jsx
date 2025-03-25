@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useNavigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactPlayer from 'react-player';
-import axios from 'axios'; // Add this import
+import axios from 'axios';
 import { 
   ArrowLeftIcon,
   HeartIcon,
@@ -12,9 +12,14 @@ import {
   UserIcon,
   ChevronDownIcon,
   XMarkIcon,
-  TrashIcon
+  TrashIcon,
+  PlayIcon,
+  ForwardIcon,
+  BackwardIcon,
+  ChevronUpIcon,
+  ChevronDoubleUpIcon
 } from '@heroicons/react/24/outline';
-import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
+import { HeartIcon as HeartIconSolid, PlayIcon as PlayIconSolid } from '@heroicons/react/24/solid';
 import { useLibrary } from '../context/LibraryContext';
 import { useNotification } from '../context/NotificationContext';
 import VideoCard from '../components/video/VideoCard';
@@ -26,14 +31,34 @@ const YouTubeIcon = () => (
   </svg>
 );
 
+// Initialize volume from localStorage or use default (0.8)
+const getSavedVolume = () => {
+  try {
+    const savedVolume = localStorage.getItem('videoPlayerVolume');
+    if (savedVolume !== null) {
+      const parsedVolume = parseFloat(savedVolume);
+      // Ensure volume is a valid number between 0 and 1
+      if (!isNaN(parsedVolume) && isFinite(parsedVolume) && parsedVolume >= 0 && parsedVolume <= 1) {
+        return parsedVolume;
+      }
+    }
+    return 0.8; // Default volume if not saved or invalid
+  } catch (err) {
+    console.error('Error reading saved volume:', err);
+    return 0.8;
+  }
+};
+
 const VideoPlayer = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const playerRef = useRef(null);
   const [video, setVideo] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [playing, setPlaying] = useState(true);
-  const [volume, setVolume] = useState(0.8);
+  const [volume, setVolume] = useState(getSavedVolume());
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isFavoriteVideo, setIsFavoriteVideo] = useState(false);
@@ -42,6 +67,12 @@ const VideoPlayer = () => {
   const [showDescription, setShowDescription] = useState(false);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  
+  // Playlist related states
+  const [currentPlaylist, setCurrentPlaylist] = useState(null);
+  const [playlistIndex, setPlaylistIndex] = useState(-1);
+  const [playlistVideos, setPlaylistVideos] = useState([]);
+  const [isPlaylistCollapsed, setIsPlaylistCollapsed] = useState(false);
   
   const { 
     fetchVideo, 
@@ -52,9 +83,87 @@ const VideoPlayer = () => {
     playlists, 
     fetchPlaylists,
     addVideoToPlaylist,
-    deleteVideo
+    deleteVideo,
+    fetchPlaylist
   } = useLibrary();
   const { success, error } = useNotification();
+
+  // Handle volume changes and save to localStorage
+  const handleVolumeChange = useCallback((event) => {
+    try {
+      // Don't use any event handlers for volume
+      // Instead, use a mute/unmute button or custom volume control if needed
+      
+      // If you need to save the volume when user changes it manually,
+      // you can listen for the video's volumechange event using a ref:
+      if (playerRef.current) {
+        const mediaElement = playerRef.current.getInternalPlayer();
+        if (mediaElement && typeof mediaElement.volume === 'number') {
+          const safeVolume = Math.min(Math.max(0, mediaElement.volume), 1);
+          localStorage.setItem('videoPlayerVolume', safeVolume.toString());
+        }
+      }
+    } catch (err) {
+      console.error('Error handling volume change:', err);
+    }
+  }, []);
+
+  // Effect to check if there's a playlist in the URL or session storage
+  useEffect(() => {
+    const playlistId = searchParams.get('playlist');
+    const indexParam = searchParams.get('index');
+    const fromPlaylist = searchParams.get('fromPlaylist') === 'true';
+    
+    if (playlistId && indexParam !== null && fromPlaylist) {
+      // Only proceed if we came from the playlist page
+      const index = parseInt(indexParam, 10);
+      
+      // Try to get the playlist from session storage first
+      let playlistData = null;
+      try {
+        const storedPlaylist = sessionStorage.getItem('currentPlaylist');
+        if (storedPlaylist) {
+          playlistData = JSON.parse(storedPlaylist);
+        }
+      } catch (err) {
+        console.error('Error reading playlist from session storage:', err);
+      }
+  
+      // If we have playlist data from session storage and it matches the ID
+      if (playlistData && playlistData.id === playlistId) {
+        setCurrentPlaylist(playlistData);
+        setPlaylistIndex(index);
+      } else {
+        // Otherwise, fetch the playlist from the API
+        fetchPlaylist(playlistId)
+          .then(data => {
+            if (data) {
+              const playlistForStorage = {
+                id: data.id,
+                name: data.name,
+                videos: data.videos.map(v => ({ id: v.id, title: v.title, thumbnail_url: v.thumbnail_url, duration_formatted: v.duration_formatted }))
+              };
+              
+              // Save to session storage for future use
+              sessionStorage.setItem('currentPlaylist', JSON.stringify(playlistForStorage));
+              
+              setCurrentPlaylist(playlistForStorage);
+              setPlaylistIndex(index);
+              setPlaylistVideos(data.videos || []);
+            }
+          })
+          .catch(err => {
+            console.error('Error fetching playlist:', err);
+            // Don't show an error to the user, just continue as normal video
+          });
+      }
+    } else {
+      // No playlist in URL or not from playlist page, clear playlist data
+      setCurrentPlaylist(null);
+      setPlaylistIndex(-1);
+      setPlaylistVideos([]);
+    }
+  }, [id, searchParams, fetchPlaylist]);
 
   const getYoutubeUrl = () => {
     if (!video || !video.youtube_id) return null;
@@ -115,6 +224,13 @@ const VideoPlayer = () => {
   const handleDuration = (duration) => {
     setDuration(duration);
   };
+
+  // Handle video end - go to next video if in playlist
+  const handleVideoEnd = () => {
+    if (currentPlaylist && playlistIndex !== -1 && playlistIndex < currentPlaylist.videos.length - 1) {
+      handleNextVideo();
+    }
+  };
   
   // Format time in seconds to MM:SS
   const formatTime = (seconds) => {
@@ -173,7 +289,12 @@ const VideoPlayer = () => {
   
   // Go back to previous page
   const goBack = () => {
-    navigate(-1);
+    // If we're in a playlist and not from the playlist page, go back to the playlist page
+    if (currentPlaylist && !searchParams.get('playlist')) {
+      navigate(`/playlist/${currentPlaylist.id}`);
+    } else {
+      navigate(-1);
+    }
   };
   
   // Toggle description expansion
@@ -203,6 +324,77 @@ const VideoPlayer = () => {
       }
     }
   };
+
+  // Navigate to previous video in the playlist
+  const handlePreviousVideo = () => {
+    if (!currentPlaylist || playlistIndex <= 0) return;
+    
+    const prevIndex = playlistIndex - 1;
+    const prevVideoId = currentPlaylist.videos[prevIndex].id;
+    
+    // Navigate to the previous video, maintaining the fromPlaylist flag
+    navigate(`/video/${prevVideoId}?playlist=${currentPlaylist.id}&index=${prevIndex}&fromPlaylist=true`);
+  };
+
+  // Navigate to next video in the playlist
+  const handleNextVideo = () => {
+    if (!currentPlaylist || playlistIndex >= currentPlaylist.videos.length - 1) return;
+    
+    const nextIndex = playlistIndex + 1;
+    const nextVideoId = currentPlaylist.videos[nextIndex].id;
+    
+    // Navigate to the next video, maintaining the fromPlaylist flag
+    navigate(`/video/${nextVideoId}?playlist=${currentPlaylist.id}&index=${nextIndex}&fromPlaylist=true`);
+  };
+
+  // Toggle playlist collapsed state
+  const togglePlaylistCollapsed = () => {
+    setIsPlaylistCollapsed(!isPlaylistCollapsed);
+  };
+
+  useEffect(() => {
+    // Set up volume change listener after the player is mounted
+    const setupVolumeListener = () => {
+      try {
+        if (playerRef.current) {
+          const mediaElement = playerRef.current.getInternalPlayer();
+          if (mediaElement) {
+            const volumeChangeHandler = () => {
+              try {
+                const currentVolume = mediaElement.volume;
+                // Ensure volume is a valid number
+                if (typeof currentVolume === 'number' && 
+                    !isNaN(currentVolume) && 
+                    isFinite(currentVolume) && 
+                    currentVolume >= 0 && 
+                    currentVolume <= 1) {
+                  setVolume(currentVolume);
+                  localStorage.setItem('videoPlayerVolume', currentVolume.toString());
+                }
+              } catch (err) {
+                console.error('Error in volume change handler:', err);
+              }
+            };
+            
+            // Add the event listener
+            mediaElement.addEventListener('volumechange', volumeChangeHandler);
+            
+            // Return cleanup function
+            return () => {
+              mediaElement.removeEventListener('volumechange', volumeChangeHandler);
+            };
+          }
+        }
+      } catch (err) {
+        console.error('Error setting up volume listener:', err);
+      }
+      return () => {}; // Empty cleanup if setup fails
+    };
+    
+    // Small delay to ensure player is initialized
+    const timeoutId = setTimeout(setupVolumeListener, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [video]);
   
   // Page animation
   const pageVariants = {
@@ -245,18 +437,30 @@ const VideoPlayer = () => {
       <div className="w-full flex flex-col items-center">
         {/* Back button - positioned in a max-width container */}
         <div className="w-full max-w-[90%] lg:max-w-[85%] xl:max-w-[80%] px-4 pt-4">
-          <button
-            className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-full"
-            onClick={goBack}
-            aria-label="Go back"
-          >
-            <ArrowLeftIcon className="w-6 h-6" />
-          </button>
+          <div className="flex items-center justify-between">
+            <button
+              className="text-text-secondary hover:text-text-primary transition-colors p-1 rounded-full"
+              onClick={goBack}
+              aria-label="Go back"
+            >
+              <ArrowLeftIcon className="w-6 h-6" />
+            </button>
+            
+            {/* Playlist info if applicable */}
+            {currentPlaylist && (
+              <div className="flex items-center gap-2">
+                <QueueListIcon className="w-5 h-5 text-accent" />
+                <span className="text-sm font-medium">
+                  {currentPlaylist.name} ({playlistIndex + 1}/{currentPlaylist.videos.length})
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Video Player - Central Piece */}
         <div className="w-full max-w-[90%] lg:max-w-[85%] xl:max-w-[80%] my-4">
-          <div className="aspect-video w-full rounded-lg overflow-hidden shadow-2xl bg-secondary/30">
+          <div className="aspect-video w-full rounded-lg overflow-hidden shadow-2xl bg-secondary/30 relative">
             <ReactPlayer
               ref={playerRef}
               url={video.video_url}
@@ -267,6 +471,7 @@ const VideoPlayer = () => {
               onStart={handleVideoStart}
               onProgress={handleProgress}
               onDuration={handleDuration}
+              onEnded={handleVideoEnd}
               config={{
                 file: {
                   tracks: video.subtitle_url ? [
@@ -285,6 +490,68 @@ const VideoPlayer = () => {
           </div>
         </div>
       </div>
+      
+      {/* Playlist Section */}
+      {currentPlaylist && playlistVideos.length > 0 && (
+        <div className="w-full max-w-[90%] lg:max-w-[85%] xl:max-w-[80%] mx-auto px-4 mb-6">
+          <div className="bg-secondary/30 rounded-lg overflow-hidden">
+            <div 
+              className="flex items-center justify-between p-3 cursor-pointer hover:bg-secondary/50 transition-colors"
+              onClick={togglePlaylistCollapsed}
+            >
+              <div className="flex items-center gap-2">
+                <QueueListIcon className="w-5 h-5 text-accent" />
+                <h3 className="font-medium">
+                  {currentPlaylist.name} • {playlistVideos.length} videos
+                </h3>
+              </div>
+              <button className="text-text-secondary hover:text-text-primary">
+                {isPlaylistCollapsed ? (
+                  <ChevronDownIcon className="w-5 h-5" />
+                ) : (
+                  <ChevronUpIcon className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+            
+            {!isPlaylistCollapsed && (
+              <div className="max-h-80 overflow-y-auto p-2">
+                {playlistVideos.map((playlistVideo, index) => (
+                  <div 
+                    key={playlistVideo.id}
+                    className={`flex items-center gap-3 p-2 rounded-lg ${
+                      playlistVideo.id.toString() === id.toString() 
+                        ? 'bg-accent/20 text-accent' 
+                        : 'hover:bg-secondary/50'
+                    } transition-colors cursor-pointer mb-2`}
+                    onClick={() => navigate(`/video/${playlistVideo.id}?playlist=${currentPlaylist.id}&index=${index}&fromPlaylist=true`)}
+                  >
+                    <div className="relative w-24 h-14 flex-shrink-0">
+                      <img 
+                        src={playlistVideo.thumbnail_url || '/placeholder-thumbnail.jpg'} 
+                        alt={playlistVideo.title}
+                        className="w-full h-full object-cover rounded"
+                      />
+                      <div className="absolute bottom-1 right-1 bg-black/80 text-white text-xs px-1 py-0.5 rounded">
+                        {playlistVideo.duration_formatted}
+                      </div>
+                      {playlistVideo.id.toString() === id.toString() && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded">
+                          <PlayIconSolid className="w-6 h-6 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-medium truncate">{playlistVideo.title}</h4>
+                      <p className="text-xs text-text-secondary truncate">{playlistVideo.channel}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       {/* Video Info Section */}
       <div className="w-full max-w-[90%] lg:max-w-[85%] xl:max-w-[80%] mx-auto px-4 pt-6 pb-16">

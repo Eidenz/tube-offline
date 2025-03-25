@@ -99,6 +99,21 @@ const PlaylistDetail = () => {
     }
   };
   
+  // Start playing the playlist from the first video
+  const handlePlayAll = () => {
+    if (videos.length > 0) {
+      // Store playlist data in sessionStorage for the video player to access
+      sessionStorage.setItem('currentPlaylist', JSON.stringify({
+        id: playlist.id,
+        name: playlist.name,
+        videos: videos.map(v => ({ id: v.id, title: v.title }))
+      }));
+      
+      // Navigate to the first video, adding the fromPlaylist flag
+      navigate(`/video/${videos[0].id}?playlist=${playlist.id}&index=0&fromPlaylist=true`);
+    }
+  };
+  
   // Toggle edit mode
   const toggleEditMode = () => {
     setIsEditMode(!isEditMode);
@@ -170,6 +185,17 @@ const PlaylistDetail = () => {
           </div>
           
           <div className="flex gap-3">
+            {videos.length > 0 && (
+              <motion.button
+                className="btn btn-primary flex items-center gap-2"
+                onClick={handlePlayAll}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <PlayIcon className="w-5 h-5" />
+                Play All
+              </motion.button>
+            )}
             <button
               className={`btn ${isEditMode ? 'btn-accent' : 'btn-outline'}`}
               onClick={toggleEditMode}
@@ -258,7 +284,7 @@ const PlaylistDetail = () => {
                                 </>
                               ) : (
                                 <Link
-                                  to={`/video/${video.id}`}
+                                  to={`/video/${video.id}?playlist=${playlist.id}&index=${index}&fromPlaylist=true`}
                                   className="p-2 text-accent hover:bg-accent/10 rounded transition-colors"
                                   aria-label="Play video"
                                 >
@@ -286,7 +312,7 @@ const PlaylistDetail = () => {
           </p>
           <Link
             to="/"
-            className="btn btn-primary"
+            className="btn btn-primary flex items-center"
           >
             <PlusIcon className="w-5 h-5 mr-2" />
             Browse Videos

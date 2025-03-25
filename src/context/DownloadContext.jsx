@@ -153,12 +153,13 @@ export const DownloadProvider = ({ children }) => {
     }
   }, [error]);
   
-  const startDownload = useCallback(async (url, quality = '720', downloadSubtitles = true) => {
+  const startDownload = useCallback(async (url, quality = 'best', downloadSubtitles = true, playlistId = null) => {
     try {
       await axios.post(DOWNLOAD_API, {
         url,
         quality,
-        downloadSubtitles
+        downloadSubtitles,
+        addToPlaylistId: playlistId
       });
       
       success('Download started!');

@@ -158,7 +158,12 @@ router.get('/playlist-info', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { url, quality = '1080', downloadSubtitles = true } = req.body;
+    const { 
+      url, 
+      quality = '1080', 
+      downloadSubtitles = true,
+      addToPlaylistId = null  // New parameter for playlist ID
+    } = req.body;
     
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
@@ -179,6 +184,39 @@ router.post('/', async (req, res) => {
       });
     }
     
+    // If addToPlaylistId is provided, store it with the download
+    if (addToPlaylistId) {
+      // Store in database that this download should be added to a playlist
+      const insertStmt = db.prepare(`
+        INSERT INTO downloads (
+          youtube_id, url, title, status, quality, 
+          download_subtitles, playlist_target_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(youtube_id) DO UPDATE SET
+        playlist_target_id = excluded.playlist_target_id
+      `);
+      
+      try {
+        // Get video info to get YouTube ID
+        const videoInfo = await getVideoInfo(url);
+        if (videoInfo && videoInfo.id) {
+          insertStmt.run(
+            videoInfo.id,
+            url,
+            videoInfo.title || 'YouTube Video',
+            'pending',
+            quality,
+            downloadSubtitles ? 1 : 0,
+            addToPlaylistId
+          );
+        }
+      } catch (err) {
+        console.error('Error getting video info for playlist addition:', err);
+        // Continue with download even if this fails
+      }
+    }
+    
     // Start download process in the background
     res.status(202).json({ message: 'Download started' });
     
@@ -186,6 +224,29 @@ router.post('/', async (req, res) => {
     downloadVideo(url, quality, downloadSubtitles, broadcastProgress)
       .then(result => {
         console.log('Download completed:', result);
+        
+        // If this download should be added to a playlist, do it now
+        if (addToPlaylistId && result && result.id) {
+          try {
+            // Get the videoId from the result
+            const videoId = result.id;
+            
+            // Add to playlist
+            const addToPlaylistStmt = db.prepare(`
+              INSERT OR IGNORE INTO playlist_videos (playlist_id, video_id, position)
+              VALUES (?, ?, (
+                SELECT COALESCE(MAX(position), 0) + 1
+                FROM playlist_videos
+                WHERE playlist_id = ?
+              ))
+            `);
+            
+            addToPlaylistStmt.run(addToPlaylistId, videoId, addToPlaylistId);
+            console.log(`Added video ${videoId} to playlist ${addToPlaylistId} after download`);
+          } catch (err) {
+            console.error('Error adding video to playlist after download:', err);
+          }
+        }
       })
       .catch(error => {
         console.error('Download failed:', error);

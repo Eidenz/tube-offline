@@ -159,6 +159,15 @@ function initializeDatabase() {
           db.exec(`ALTER TABLE downloads ADD COLUMN playlist_complete INTEGER DEFAULT 0`);
           console.log('Added playlist_complete column to downloads table');
         }
+
+        // Check if the playlist_target_id column exists
+        const checkColumn = db.prepare(`PRAGMA table_info(downloads)`).all();
+        const hasPlaylistTargetColumn = checkColumn.some(col => col.name === 'playlist_target_id');
+        
+        if (!hasPlaylistTargetColumn) {
+          console.log('Adding playlist_target_id column to downloads table');
+          db.exec(`ALTER TABLE downloads ADD COLUMN playlist_target_id INTEGER DEFAULT NULL`);
+        }
       } catch (error) {
         console.error('Error updating downloads table schema:', error);
         // Continue initialization even if this fails

@@ -65,7 +65,11 @@ const Sidebar = ({ isOpen }) => {
   // Use state only for forcing a re-render when necessary
   const [downloadCount, setDownloadCount] = useState(0);
   // Add state for collapsed sidebar
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    // Initialize from localStorage with a default of false
+    const savedState = localStorage.getItem('sidebarCollapsed');
+    return savedState !== null ? JSON.parse(savedState) : false;
+  });
   
   // Create a separate effect for monitoring active downloads
   // This will run outside the render cycle
@@ -95,9 +99,11 @@ const Sidebar = ({ isOpen }) => {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Toggle collapsed state
+  // Toggle collapsed state and save to localStorage
   const toggleCollapsed = () => {
-    setIsCollapsed(!isCollapsed);
+    const newState = !isCollapsed;
+    setIsCollapsed(newState);
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
   };
 
   const sidebarVariants = {
