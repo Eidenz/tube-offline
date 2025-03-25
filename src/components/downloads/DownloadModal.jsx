@@ -422,11 +422,14 @@ const DownloadModal = ({ isOpen, onClose }) => {
                     <AnimatePresence>
                       {showPlaylistDropdown && (
                         <motion.div
-                          className="absolute top-full left-0 right-0 mt-1 bg-primary border border-[#3f3f3f] rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto"
+                          className="absolute top-full left-0 right-0 mt-1 bg-primary border border-[#3f3f3f] rounded-lg shadow-lg z-10 overflow-y-auto"
                           variants={dropdownVariants}
                           initial="hidden"
                           animate="visible"
                           exit="hidden"
+                          style={{
+                            maxHeight: '11vh'
+                          }}
                         >
                           {/* Create new playlist option (only shown for playlists) */}
                           {isPlaylist && (
@@ -438,7 +441,7 @@ const DownloadModal = ({ isOpen, onClose }) => {
                               <span>Create new playlist</span>
                             </div>
                           )}
-
+                        
                           {/* Don't add to playlist option */}
                           <div
                             className="p-3 flex items-center gap-2 hover:bg-hover cursor-pointer border-b border-[#3f3f3f]"
@@ -446,7 +449,7 @@ const DownloadModal = ({ isOpen, onClose }) => {
                           >
                             <span>Don't add to playlist</span>
                           </div>
-
+                        
                           {/* List of available playlists */}
                           {availablePlaylists.length > 0 ? (
                             availablePlaylists.map(playlist => (
