@@ -4,6 +4,9 @@ An elegant offline YouTube video library using YT-DLP with a React frontend and 
 
 ![TubeOffline Screenshot](screenshot.png)
 
+![image](https://github.com/user-attachments/assets/7f216eae-9eef-4d4b-9733-a538e5857710)
+
+
 ## ⚠️ Disclaimer / AI-Generated Project Warning
 
 **This project was mostly coded using AI (Claude 3.7 Sonnet Thinking).**
