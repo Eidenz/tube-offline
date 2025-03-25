@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { db } from './database.js';
 import config from '../config.js';
+// Import the broadcastDownloadComplete function from websocket.js
+import { broadcastDownloadComplete } from '../websocket.js';
 
 // Get current directory (ES Module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -275,16 +277,21 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
               linkTagStmt.run(youtubeId, tag);
             }
           }
-          
-          // Return download result
-          resolve({
-            youtubeId,
+
+          // Prepare a response object with video data that we can use for notifications
+          const videoData = {
+            id: youtubeId,
             title: videoInfo.title,
             videoPath: relativeVideoPath,
             thumbnailPath: relativeThumbnailPath,
             subtitlePath: relativeSubtitlePath,
             duration: videoInfo.duration
-          });
+          };
+
+          broadcastDownloadComplete(youtubeId, videoData);
+          
+          // Return download result
+          resolve(videoData);
           
         } catch (error) {
           // Update database with error

@@ -18,6 +18,7 @@ import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
 import { useLibrary } from '../context/LibraryContext';
 import { useNotification } from '../context/NotificationContext';
 import VideoCard from '../components/video/VideoCard';
+import VideoQualityBadge from '../components/video/VideoQualityBadge';
 
 const VideoPlayer = () => {
   const { id } = useParams();
@@ -342,8 +343,14 @@ const VideoPlayer = () => {
             </div>
             <div>
               <h3 className="font-medium text-lg">{video.channel}</h3>
-              <div className="text-sm text-text-secondary">
+              <div className="flex flex-wrap gap-2 text-sm text-text-secondary">
                 {video.view_count && <span>{video.view_count} views</span>}
+                {video.metadata && (
+                  <>
+                    {video.view_count && <span className="text-text-secondary/50">•</span>}
+                    <VideoQualityBadge metadata={video.metadata} />
+                  </>
+                )}
               </div>
             </div>
           </div>

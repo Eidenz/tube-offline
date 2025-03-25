@@ -92,6 +92,15 @@ router.get('/:id', (req, res) => {
     
     const tags = tagsStmt.all(video.id);
     
+    // Parse metadata
+    let parsedMetadata = null;
+    try {
+      parsedMetadata = video.metadata ? JSON.parse(video.metadata) : null;
+    } catch (e) {
+      console.error('Error parsing video metadata:', e);
+      parsedMetadata = null;
+    }
+    
     // Format response
     const formattedVideo = {
       ...video,
@@ -100,7 +109,7 @@ router.get('/:id', (req, res) => {
       thumbnail_url: `/thumbnails/${path.basename(video.thumbnail_path)}`,
       subtitle_url: video.subtitle_path ? `/subtitles/${path.basename(video.subtitle_path)}` : null,
       duration_formatted: formatDuration(video.duration),
-      metadata: video.metadata ? JSON.parse(video.metadata) : null
+      metadata: parsedMetadata
     };
     
     res.json(formattedVideo);

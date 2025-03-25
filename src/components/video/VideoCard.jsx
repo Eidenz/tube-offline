@@ -1,6 +1,63 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ClockIcon, ArrowPathIcon, CheckCircleIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { ClockIcon, ArrowPathIcon, CheckCircleIcon, FilmIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { useMemo } from 'react';
+
+// Helper function to determine video quality from metadata
+function getVideoQuality(metadata) {
+  try {
+    // Parse metadata if it's a string
+    const parsedMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata;
+    
+    // Safety check
+    if (!parsedMetadata) {
+      return null;
+    }
+    
+    // Check for height property
+    if (parsedMetadata.height) {
+      return `${parsedMetadata.height}p`;
+    }
+    
+    // Check formats array for resolution information
+    if (parsedMetadata.formats && Array.isArray(parsedMetadata.formats)) {
+      // Find the video format with the highest resolution
+      const videoFormats = parsedMetadata.formats.filter(f => 
+        f.vcodec && f.vcodec !== 'none' && f.vcodec !== 'null'
+      );
+      
+      if (videoFormats.length > 0) {
+        // Sort by height (resolution) in descending order
+        videoFormats.sort((a, b) => (b.height || 0) - (a.height || 0));
+        const bestFormat = videoFormats[0];
+        
+        if (bestFormat.height) {
+          return `${bestFormat.height}p`;
+        }
+      }
+    }
+    
+    // Check requested_formats for resolution info
+    if (parsedMetadata.requested_formats && Array.isArray(parsedMetadata.requested_formats)) {
+      const videoFormat = parsedMetadata.requested_formats.find(f => 
+        f.vcodec && f.vcodec !== 'none'
+      );
+      if (videoFormat && videoFormat.height) {
+        return `${videoFormat.height}p`;
+      }
+    }
+    
+    // Check resolution string
+    if (parsedMetadata.resolution) {
+      return parsedMetadata.resolution;
+    }
+    
+    return null;
+  } catch (err) {
+    console.error("Error determining video quality:", err);
+    return null;
+  }
+}
 
 const VideoCard = ({ video, isDownloading = false, progress = 0 }) => {
   const {
@@ -64,7 +121,12 @@ const VideoCard = ({ video, isDownloading = false, progress = 0 }) => {
     }
   };
 
-  // Format the date for display
+  // Calculate video quality only once per render using useMemo
+  const videoQuality = useMemo(() => {
+    return metadata ? getVideoQuality(metadata) : null;
+  }, [metadata]);
+
+  // Format last_viewed date if available
   const formatDate = (dateObj) => {
     if (!dateObj) return 'Unknown date';
     
@@ -132,6 +194,14 @@ const VideoCard = ({ video, isDownloading = false, progress = 0 }) => {
             loading="lazy"
           />
           <div className="duration">{duration_formatted}</div>
+          
+          {/* Video quality badge - show on hover */}
+          {videoQuality && (
+            <div className="absolute top-2 left-2 bg-black/60 px-2 py-1 rounded text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-1">
+              <FilmIcon className="w-3 h-3" />
+              <span>{videoQuality}</span>
+            </div>
+          )}
         </div>
         
         <div className="video-info">
