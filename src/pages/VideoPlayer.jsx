@@ -78,7 +78,7 @@ const VideoPlayer = () => {
     fetchVideo, 
     recordVideoView, 
     videos, 
-    isFavorite, 
+    allFavoriteIds,
     toggleFavorite, 
     playlists, 
     fetchPlaylists,
@@ -198,15 +198,12 @@ const VideoPlayer = () => {
   }, [id, fetchVideo, navigate, error, videos, fetchPlaylists]);
 
   useEffect(() => {
-    const checkFavoriteStatus = async () => {
-      if (video?.id) {
-        const status = await isFavorite(video.id);
-        setIsFavoriteVideo(status);
-      }
-    };
-    
-    checkFavoriteStatus();
-  }, [video, isFavorite]);
+    if (video?.id) {
+      // Check if this video is a favorite using the global state
+      const isFav = allFavoriteIds.includes(parseInt(video.id)) || allFavoriteIds.includes(video.id);
+      setIsFavoriteVideo(isFav);
+    }
+  }, [video, allFavoriteIds]);
   
   // Record view when the video starts playing
   const handleVideoStart = () => {
@@ -352,93 +349,34 @@ const VideoPlayer = () => {
     setIsPlaylistCollapsed(!isPlaylistCollapsed);
   };
 
-  // Updated findRelatedVideos function with case-insensitive tag comparison
-  const findRelatedVideos = useCallback(async (currentVideo) => {
-    if (!currentVideo || !currentVideo.tags || currentVideo.tags.length === 0) {
-      // If no tags, just return recent videos as fallback
-      return videos.filter(v => v.id !== currentVideo.id).slice(0, 6);
-    }
+  // Fetch related videos from the backend
+  const fetchRelatedVideos = useCallback(async (videoId) => {
+    if (!videoId) return [];
     
+    setIsLoadingRelated(true);
     try {
-      // Extract tag information from the current video
-      const currentVideoTagIds = currentVideo.tags.map(tag => tag.id);
-      const currentVideoTagNames = currentVideo.tags.map(tag => tag.name.toLowerCase()); // Lowercase for case-insensitive comparison
-      
-      // Create an array to store videos with their similarity scores
-      const videosWithScores = [];
-      
-      // Calculate similarity scores for all videos
-      for (const vid of videos) {
-        // Skip the current video
-        if (vid.id === currentVideo.id) continue;
-        
-        // Get tags for this video
-        let videoTags = [];
-        try {
-          // Try to fetch the video details to get its tags
-          const response = await axios.get(`/api/videos/${vid.id}`);
-          if (response.data && response.data.tags) {
-            videoTags = response.data.tags;
-          }
-        } catch (err) {
-          console.error(`Failed to fetch tags for video ${vid.id}:`, err);
-          // Continue with empty tags if fetch fails
-        }
-        
-        // Count shared tags - use both ID and name (case-insensitive) comparison
-        const sharedTagIds = [];
-        const sharedTagObjects = [];
-        
-        for (const tag of videoTags) {
-          // Check by ID (primary method)
-          if (currentVideoTagIds.includes(tag.id)) {
-            sharedTagIds.push(tag.id);
-            sharedTagObjects.push(tag);
-          }
-          // Fallback: check by name (case-insensitive)
-          else if (currentVideoTagNames.includes(tag.name.toLowerCase())) {
-            sharedTagIds.push(tag.id);
-            sharedTagObjects.push(tag);
-          }
-        }
-        
-        const similarityScore = sharedTagIds.length;
-        
-        // Only include videos that share at least one tag
-        if (similarityScore > 0) {
-          videosWithScores.push({
-            video: vid,
-            score: similarityScore,
-            sharedTags: sharedTagObjects
-          });
-        }
-      }
-      
-      // Sort by similarity score (highest first)
-      videosWithScores.sort((a, b) => b.score - a.score);
-      
-      // Get the top 6 related videos with their shared tags
-      const topRelated = videosWithScores.slice(0, 6).map(item => ({
-        ...item.video,
-        sharedTags: item.sharedTags
-      }));
-      
-      return topRelated;
-    } catch (error) {
-      console.error("Error finding related videos:", error);
-      // Fallback to recent videos
-      return videos.filter(v => v.id !== currentVideo.id).slice(0, 6);
+      const response = await axios.get(`/api/videos/${videoId}/related`);
+      return response.data || [];
+    } catch (err) {
+      console.error('Failed to fetch related videos:', err);
+      // Fallback to recent videos if the API fails
+      return videos.filter(v => v.id !== videoId).slice(0, 6);
+    } finally {
+      setIsLoadingRelated(false);
     }
   }, [videos]);
 
+  // Add this state for tracking loading status
+  const [isLoadingRelated, setIsLoadingRelated] = useState(false);
+
+  // Update the useEffect to use our new function
   useEffect(() => {
-    if (video) {
-      // Find related videos when the current video loads
-      findRelatedVideos(video).then(related => {
+    if (video?.id) {
+      fetchRelatedVideos(video.id).then(related => {
         setRelatedVideos(related);
       });
     }
-  }, [video, findRelatedVideos]);
+  }, [video, fetchRelatedVideos]);
 
   useEffect(() => {
     // Set up volume change listener after the player is mounted
@@ -813,35 +751,47 @@ const VideoPlayer = () => {
               Related Videos
             </h3>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {relatedVideos.map((relatedVideo, index) => (
-                <motion.div
-                  key={relatedVideo.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 * index }}
-                  className="group"
-                >
-                  <VideoCard video={relatedVideo} />
-                  
-                  {/* Show shared tags if any */}
-                  {relatedVideo.sharedTags && relatedVideo.sharedTags.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {relatedVideo.sharedTags.slice(0, 3).map(tag => (
-                        <span key={tag.id} className="text-xs bg-accent/10 text-accent px-2 py-1 rounded-full">
-                          {tag.name}
-                        </span>
-                      ))}
-                      {relatedVideo.sharedTags.length > 3 && (
-                        <span className="text-xs bg-secondary/50 text-text-secondary px-2 py-1 rounded-full">
-                          +{relatedVideo.sharedTags.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </div>
+            {isLoadingRelated ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+              </div>
+            ) : relatedVideos.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {relatedVideos.map((relatedVideo, index) => (
+                  <motion.div
+                    key={relatedVideo.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: 0.1 * index }}
+                    className="group"
+                  >
+                    <VideoCard video={relatedVideo} />
+                    
+                    {/* Show shared tags if any */}
+                    {relatedVideo.sharedTags && relatedVideo.sharedTags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {relatedVideo.sharedTags.slice(0, 3).map(tag => (
+                          <span key={tag.id} className="text-xs bg-accent/10 text-accent px-2 py-1 rounded-full">
+                            {tag.name}
+                          </span>
+                        ))}
+                        {relatedVideo.sharedTags.length > 3 && (
+                          <span className="text-xs bg-secondary/50 text-text-secondary px-2 py-1 rounded-full">
+                            +{relatedVideo.sharedTags.length - 3} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-secondary/30 rounded-lg p-8 text-center text-text-secondary">
+                <FilmIcon className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                <h3 className="text-xl font-medium mb-2">No related videos found</h3>
+                <p>Try adding more tags to videos to get better recommendations</p>
+              </div>
+            )}
           </motion.div>
         )}
       </div>

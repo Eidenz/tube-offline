@@ -30,6 +30,20 @@ export const LibraryProvider = ({ children }) => {
   
   const { success, error } = useNotification();
   const lastRefreshTimestamp = useRef(Date.now());
+  const [allFavoriteIds, setAllFavoriteIds] = useState([]);
+
+  const fetchAllFavoriteIds = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_URL}/favorites/ids`);
+      if (response.data && response.data.favoriteIds) {
+        setAllFavoriteIds(response.data.favoriteIds);
+      }
+      return response.data.favoriteIds || [];
+    } catch (err) {
+      console.error('Failed to fetch favorite IDs:', err);
+      return [];
+    }
+  }, []);
   
   // Fetch videos with pagination
   const fetchVideos = useCallback(async (limit = 20, offset = 0) => {
@@ -117,30 +131,38 @@ export const LibraryProvider = ({ children }) => {
   }, [error]);
 
   // Check if a video is a favorite
-  const isFavorite = useCallback(async (id) => {
-    try {
-      const response = await axios.get(`${API_URL}/favorites/status/${id}`);
-      return response.data.isFavorite;
-    } catch (err) {
-      console.error('Failed to check favorite status:', err);
-      return false;
+  const isFavorite = useCallback((id) => {
+    // First check if we have the ID in our local state
+    if (allFavoriteIds.includes(parseInt(id)) || allFavoriteIds.includes(id)) {
+      return Promise.resolve(true);
     }
-  }, []);
+    
+    // If not found in local state, make the API call as fallback
+    return axios.get(`${API_URL}/favorites/status/${id}`)
+      .then(response => response.data.isFavorite)
+      .catch(() => false);
+  }, [allFavoriteIds]);
 
   // Toggle favorite status for a video
   const toggleFavorite = useCallback(async (id) => {
     try {
       // First check current status
-      const currentStatus = await isFavorite(id);
+      const isCurrentlyFavorite = allFavoriteIds.includes(parseInt(id)) || allFavoriteIds.includes(id);
       
-      if (currentStatus) {
+      if (isCurrentlyFavorite) {
         // Remove from favorites
         await axios.delete(`${API_URL}/favorites/${id}`);
+        // Update local state
+        setAllFavoriteIds(prev => prev.filter(favId => 
+          favId !== parseInt(id) && favId !== id
+        ));
         success('Removed from favorites');
         return false;
       } else {
         // Add to favorites
         await axios.post(`${API_URL}/favorites/${id}`);
+        // Update local state
+        setAllFavoriteIds(prev => [...prev, parseInt(id)]);
         success('Added to favorites');
         return true;
       }
@@ -149,7 +171,7 @@ export const LibraryProvider = ({ children }) => {
       error('Failed to update favorites');
       return null;
     }
-  }, [isFavorite, success, error]);
+  }, [allFavoriteIds, success, error]);
 
   // Add to favorites
   const addToFavorites = useCallback(async (id) => {
@@ -469,6 +491,7 @@ export const LibraryProvider = ({ children }) => {
     fetchRecentVideos();
     fetchPlaylists();
     fetchTags();
+    fetchAllFavoriteIds();
     
     // Load favorites from localStorage
     try {
@@ -511,7 +534,7 @@ export const LibraryProvider = ({ children }) => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('refreshLibrary', handleRefreshEvent);
     };
-  }, [fetchVideos, fetchRecentVideos, fetchPlaylists, fetchTags, refreshLibrary]);
+  }, [fetchVideos, fetchRecentVideos, fetchPlaylists, fetchTags, fetchAllFavoriteIds, refreshLibrary]);
   
   return (
     <LibraryContext.Provider
@@ -544,7 +567,9 @@ export const LibraryProvider = ({ children }) => {
         fetchTags,
         getTopTags,
         getPlaylistThumbnail,
-        refreshLibrary
+        refreshLibrary,
+        allFavoriteIds,
+        fetchAllFavoriteIds,
       }}
     >
       {children}

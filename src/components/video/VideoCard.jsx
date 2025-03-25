@@ -74,20 +74,11 @@ const VideoCard = ({ video, isDownloading = false, progress = 0 }) => {
     metadata
   } = video;
 
+  const { allFavoriteIds } = useLibrary();
   const { isFavorite } = useLibrary();
-  const [isFavoriteVideo, setIsFavoriteVideo] = useState(false);
-
-  // Check if the video is a favorite
-  useEffect(() => {
-    const checkFavoriteStatus = async () => {
-      if (video?.id) {
-        const status = await isFavorite(video.id);
-        setIsFavoriteVideo(status);
-      }
-    };
-    
-    checkFavoriteStatus();
-  }, [video, isFavorite]);
+  const isFavoriteVideo = useMemo(() => {
+    return allFavoriteIds.includes(parseInt(id)) || allFavoriteIds.includes(id);
+  }, [id, allFavoriteIds]);
 
   // Try to get the publication date from metadata
   const getPublishedDate = () => {

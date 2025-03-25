@@ -246,4 +246,108 @@ function formatDuration(seconds) {
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Get related videos based on shared tags
+ * GET /api/videos/:id/related
+ */
+router.get('/:id/related', (req, res) => {
+  try {
+    const videoId = req.params.id;
+    const limit = parseInt(req.query.limit) || 6;
+    
+    // First, get all tags for the current video
+    const getTagsStmt = db.prepare(`
+      SELECT t.id, t.name
+      FROM tags t
+      JOIN video_tags vt ON t.id = vt.tag_id
+      WHERE vt.video_id = ?
+    `);
+    
+    const tags = getTagsStmt.all(videoId);
+    
+    if (!tags || tags.length === 0) {
+      // If no tags, return recent videos as fallback
+      const recentStmt = db.prepare(`
+        SELECT 
+          v.id, v.youtube_id, v.title, v.channel, v.thumbnail_path, 
+          v.duration, v.view_count, v.date_added
+        FROM videos v 
+        WHERE v.id != ?
+        ORDER BY v.date_added DESC
+        LIMIT ?
+      `);
+      
+      const recentVideos = recentStmt.all(videoId, limit);
+      
+      // Format response
+      const formattedVideos = recentVideos.map(video => ({
+        ...video,
+        thumbnail_url: `/thumbnails/${path.basename(video.thumbnail_path)}`,
+        duration_formatted: formatDuration(video.duration),
+        sharedTags: []
+      }));
+      
+      return res.json(formattedVideos);
+    }
+    
+    // Get tag IDs
+    const tagIds = tags.map(tag => tag.id);
+    
+    // Use a complex query to find videos that share tags with the current video
+    // and calculate a similarity score based on the number of shared tags
+    const relatedStmt = db.prepare(`
+      WITH shared_tags AS (
+        SELECT 
+          v.id AS video_id,
+          t.id AS tag_id,
+          t.name AS tag_name,
+          COUNT(*) OVER (PARTITION BY v.id) AS tag_count
+        FROM videos v
+        JOIN video_tags vt ON v.id = vt.video_id
+        JOIN tags t ON vt.tag_id = t.id
+        WHERE vt.tag_id IN (${tagIds.map(() => '?').join(',')})
+        AND v.id != ?
+      )
+      SELECT 
+        v.id, v.youtube_id, v.title, v.channel, v.thumbnail_path, 
+        v.duration, v.view_count, v.date_added,
+        MAX(st.tag_count) AS shared_tag_count,
+        GROUP_CONCAT(st.tag_id || ':' || st.tag_name, '|') AS shared_tags_data
+      FROM videos v
+      JOIN shared_tags st ON v.id = st.video_id
+      GROUP BY v.id
+      ORDER BY shared_tag_count DESC, v.date_added DESC
+      LIMIT ?
+    `);
+    
+    // Execute query with tag IDs and current video ID as parameters
+    const params = [...tagIds, videoId, limit];
+    const relatedVideos = relatedStmt.all(...params);
+    
+    // Process results and format shared tags
+    const formattedVideos = relatedVideos.map(video => {
+      // Parse shared tags data
+      let sharedTags = [];
+      if (video.shared_tags_data) {
+        sharedTags = video.shared_tags_data.split('|').map(item => {
+          const [tagId, tagName] = item.split(':');
+          return { id: parseInt(tagId), name: tagName };
+        });
+      }
+      
+      return {
+        ...video,
+        thumbnail_url: `/thumbnails/${path.basename(video.thumbnail_path)}`,
+        duration_formatted: formatDuration(video.duration),
+        sharedTags: sharedTags
+      };
+    });
+    
+    res.json(formattedVideos);
+  } catch (error) {
+    console.error('Failed to fetch related videos:', error);
+    res.status(500).json({ error: 'Failed to fetch related videos' });
+  }
+});
+
 export default router;

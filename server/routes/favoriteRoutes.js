@@ -11,6 +11,27 @@ const __dirname = dirname(__filename);
 const router = express.Router();
 
 /**
+ * Get all favorite video IDs in a single call
+ * GET /api/favorites/ids
+ */
+router.get('/ids', (req, res) => {
+  try {
+    const stmt = db.prepare(`
+      SELECT video_id 
+      FROM favorites
+    `);
+    
+    const favorites = stmt.all();
+    const favoriteIds = favorites.map(item => item.video_id);
+    
+    res.json({ favoriteIds });
+  } catch (error) {
+    console.error('Failed to fetch favorite IDs:', error);
+    res.status(500).json({ error: 'Failed to fetch favorite IDs' });
+  }
+});
+
+/**
  * Get favorite status for a video
  * GET /api/favorites/status/:id
  */
