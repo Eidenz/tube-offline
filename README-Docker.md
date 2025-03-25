@@ -11,21 +11,23 @@ This guide explains how to run TubeOffline using Docker, which simplifies setup 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/tube-offline.git
+   git clone https://git.eidenz.moe/Eidenz/tube-offline.git
    cd tube-offline
    ```
 
 2. Make the start script executable:
    ```bash
-   chmod +x start.sh
+   chmod +x tubeoffline.sh
    ```
 
 3. Run the start script:
    ```bash
-   ./start.sh
+   ./tubeoffline.sh start
    ```
 
 4. Access TubeOffline in your browser at [http://localhost:5000](http://localhost:5000) (or your custom port if configured)
+
+**Note: You can view all available commands by running `./tubeoffline.sh help`.**
 
 ## Configuration Options
 

@@ -23,7 +23,7 @@ The easiest way to run TubeOffline is using Docker:
 
 2. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/tube-offline.git
+   git clone https://git.eidenz.moe/Eidenz/tube-offline.git
    cd tube-offline
    ```
 
@@ -68,7 +68,7 @@ sudo chmod a+rx /usr/local/bin/yt-dlp
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/tube-offline.git
+git clone https://git.eidenz.moe/Eidenz/tube-offline.git
 cd tube-offline
 ```
 
