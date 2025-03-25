@@ -76,6 +76,21 @@ function broadcastDownloadComplete(youtubeId, videoData) {
       client.send(message);
     }
   });
+  
+  // Add this code to trigger the library refresh event:
+  // This ensures that even without websockets, the library will refresh
+  try {
+    // Trigger a custom event that the LibraryContext can listen for
+    const event = new Event('tube-offline-download-completed');
+    global.document = global.document || { dispatchEvent: () => {} };
+    global.document.dispatchEvent(event);
+    
+    // Also set a flag in the global space that can be checked
+    global.downloadCompletedAt = Date.now();
+    global.lastCompletedVideoId = youtubeId;
+  } catch (err) {
+    console.error('Error dispatching download completion event:', err);
+  }
 }
 
 export {

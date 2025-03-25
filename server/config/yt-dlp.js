@@ -724,6 +724,419 @@ function checkYtDlpInstalled() {
   });
 }
 
+/**
+ * Get playlist information using yt-dlp
+ * @param {string} url YouTube playlist URL
+ * @returns {Promise<Object>} Playlist information
+ */
+function getPlaylistInfo(url) {
+  return new Promise((resolve, reject) => {
+    // Use --dump-single-json to get all information in a single JSON output
+    // Avoid --flat-playlist which would limit the video details
+    const args = [
+      '--dump-single-json',
+      '--no-flat-playlist',
+      url
+    ];
+    
+    console.log('Getting playlist info with command:', 'yt-dlp', args.join(' '));
+    
+    const ytDlp = spawn('yt-dlp', args);
+    let stdout = '';
+    let stderr = '';
+    
+    ytDlp.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    ytDlp.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    ytDlp.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`yt-dlp failed with code ${code}: ${stderr}`);
+        
+        // Try a fallback approach with simpler options
+        console.log('Trying fallback approach to get playlist info...');
+        
+        const fallbackArgs = [
+          '--get-id',
+          '--get-title',
+          '--get-thumbnail',
+          url
+        ];
+        
+        const fallbackYtDlp = spawn('yt-dlp', fallbackArgs);
+        let fallbackStdout = '';
+        let fallbackStderr = '';
+        
+        fallbackYtDlp.stdout.on('data', (data) => {
+          fallbackStdout += data.toString();
+        });
+        
+        fallbackYtDlp.stderr.on('data', (data) => {
+          fallbackStderr += data.toString();
+        });
+        
+        fallbackYtDlp.on('close', (fallbackCode) => {
+          if (fallbackCode !== 0) {
+            return reject(new Error(`Both yt-dlp approaches failed: ${stderr}\n${fallbackStderr}`));
+          }
+          
+          // Parse the output which is id, title, and thumbnail URL on separate lines
+          const lines = fallbackStdout.trim().split('\n');
+          const entries = [];
+          const videoCount = Math.floor(lines.length / 3);
+          
+          for (let i = 0; i < lines.length; i += 3) {
+            if (i + 2 < lines.length) {
+              entries.push({
+                id: lines[i].trim(),
+                title: lines[i + 1].trim(),
+                thumbnail: lines[i + 2].trim()
+              });
+            }
+          }
+          
+          // Extract the playlist ID from the URL or the first video ID
+          let playlistId = '';
+          if (url.includes('list=')) {
+            playlistId = url.split('list=')[1].split('&')[0];
+          } else if (entries.length > 0) {
+            playlistId = 'PL' + entries[0].id;
+          } else {
+            playlistId = 'unknown-' + Date.now();
+          }
+          
+          // Extract the playlist title from the URL
+          let playlistTitle = 'YouTube Playlist';
+          if (entries.length > 0) {
+            // Use the first video title and clean it up
+            const firstTitle = entries[0].title;
+            // Remove common automatically generated playlist titles
+            playlistTitle = firstTitle
+              .replace(/playlist|mix -/i, '')
+              .replace(/- YouTube$/, '')
+              .trim();
+          }
+          
+          const playlistInfo = {
+            _type: 'playlist',
+            id: playlistId,
+            title: playlistTitle,
+            entries: entries,
+            webpage_url: url
+          };
+          
+          resolve(playlistInfo);
+        });
+        
+        return;
+      }
+      
+      try {
+        // Parse the JSON output
+        const playlistInfo = JSON.parse(stdout);
+        
+        // Ensure we have the entries field as an array
+        if (!playlistInfo.entries) {
+          playlistInfo.entries = [];
+        }
+        
+        // Check if it's a single video
+        if (playlistInfo._type === 'video' || !playlistInfo._type) {
+          // Create a playlist structure with a single video
+          const singleVideoPlaylist = {
+            _type: 'playlist',
+            id: playlistInfo.id || 'single-' + Date.now(),
+            title: playlistInfo.title || 'Single Video',
+            entries: [playlistInfo],
+            webpage_url: url
+          };
+          
+          resolve(singleVideoPlaylist);
+        } else {
+          resolve(playlistInfo);
+        }
+      } catch (error) {
+        reject(new Error(`Failed to parse yt-dlp output: ${error.message}`));
+      }
+    });
+  });
+}
+
+/**
+ * Download a YouTube playlist
+ * @param {string} url YouTube playlist URL
+ * @param {string} quality Video quality (e.g. '1080', '720', '480', '360', 'audio')
+ * @param {boolean} downloadSubtitles Whether to download subtitles
+ * @param {string|null} localPlaylistId Local playlist ID to add videos to
+ * @param {Function} progressCallback Callback for playlist download progress updates
+ * @returns {Promise<Object>} Download result
+ */
+async function downloadPlaylist(url, quality, downloadSubtitles = true, localPlaylistId = null, progressCallback = () => {}) {
+  // First get playlist info
+  let playlistInfo;
+  try {
+    playlistInfo = await getPlaylistInfo(url);
+    
+    if (!playlistInfo || !playlistInfo.id) {
+      throw new Error('Failed to get playlist information');
+    }
+    
+    // Make sure we have entries
+    if (!playlistInfo.entries || !Array.isArray(playlistInfo.entries) || playlistInfo.entries.length === 0) {
+      console.warn('No video entries found in playlist, trying direct approach...');
+      
+      // Try executing yt-dlp directly to list video IDs
+      const videoIds = await new Promise((resolve, reject) => {
+        const ytDlp = spawn('yt-dlp', ['--get-id', url]);
+        let stdout = '';
+        let stderr = '';
+        
+        ytDlp.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        ytDlp.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        ytDlp.on('close', (code) => {
+          if (code !== 0) {
+            reject(new Error(`yt-dlp failed to get video IDs: ${stderr}`));
+            return;
+          }
+          
+          // Parse video IDs
+          const ids = stdout.trim().split('\n').filter(id => id.trim());
+          resolve(ids);
+        });
+      });
+      
+      if (videoIds.length === 0) {
+        throw new Error('Could not find any videos in the playlist');
+      }
+      
+      // Create entry objects for each video ID
+      playlistInfo.entries = videoIds.map(id => ({
+        id,
+        title: `Video ${id}`,
+        webpage_url: `https://www.youtube.com/watch?v=${id}`
+      }));
+      
+      console.log(`Found ${videoIds.length} videos in playlist using direct approach`);
+    }
+    
+    console.log(`Starting download of playlist: ${playlistInfo.title}`);
+    console.log(`Playlist contains ${playlistInfo.entries.length} videos`);
+    
+    // Update download status in database
+    const downloadStmt = db.prepare(`
+      UPDATE downloads SET 
+      status = 'downloading',
+      progress = 0,
+      date_started = CURRENT_TIMESTAMP,
+      playlist_size = ?
+      WHERE youtube_id = ?
+    `);
+    
+    downloadStmt.run(
+      playlistInfo.entries.length,
+      playlistInfo.id
+    );
+    
+    // Download each video in the playlist
+    const videos = playlistInfo.entries;
+    const totalVideos = videos.length;
+    const results = [];
+    let completed = 0;
+    
+    for (let i = 0; i < videos.length; i++) {
+      const video = videos[i];
+      const videoId = video.id;
+      
+      if (!videoId) {
+        console.warn(`No ID found for video at index ${i}, skipping`);
+        continue;
+      }
+      
+      // Skip videos that are already downloaded
+      const checkStmt = db.prepare('SELECT id FROM videos WHERE youtube_id = ?');
+      const existingVideo = checkStmt.get(videoId);
+      
+      if (existingVideo) {
+        console.log(`Video ${videoId} already downloaded, skipping`);
+        completed++;
+        
+        // Add to playlist if needed
+        if (localPlaylistId) {
+          try {
+            // Check if the video is already in the playlist
+            const checkPlaylistStmt = db.prepare(`
+              SELECT 1 FROM playlist_videos
+              WHERE playlist_id = ? AND video_id = ?
+            `);
+            const inPlaylist = checkPlaylistStmt.get(localPlaylistId, existingVideo.id);
+            
+            if (!inPlaylist) {
+              // Add to playlist
+              const addToPlaylistStmt = db.prepare(`
+                INSERT INTO playlist_videos (playlist_id, video_id, position)
+                VALUES (?, ?, (
+                  SELECT COALESCE(MAX(position), 0) + 1
+                  FROM playlist_videos
+                  WHERE playlist_id = ?
+                ))
+              `);
+              
+              addToPlaylistStmt.run(localPlaylistId, existingVideo.id, localPlaylistId);
+              console.log(`Added existing video ${videoId} to playlist ${localPlaylistId}`);
+            }
+          } catch (err) {
+            console.error(`Error adding existing video to playlist: ${err.message}`);
+          }
+        }
+        
+        // Update progress
+        progressCallback(
+          playlistInfo.id,
+          totalVideos,
+          completed,
+          i+1 < videos.length ? videos[i+1].title || videos[i+1].id : null
+        );
+        
+        continue;
+      }
+      
+      try {
+        console.log(`Downloading video ${i+1}/${totalVideos}: ${video.title || videoId}`);
+        
+        // Update progress callback
+        progressCallback(
+          playlistInfo.id,
+          totalVideos,
+          completed,
+          video.title || videoId
+        );
+        
+        // Get the video URL
+        const videoUrl = video.webpage_url || `https://www.youtube.com/watch?v=${videoId}`;
+        
+        // Download the video
+        const result = await downloadVideo(
+          videoUrl,
+          quality,
+          downloadSubtitles,
+          (youtubeId, progress) => {
+            // Just log progress but don't broadcast - too noisy
+            if (progress % 25 === 0) {
+              console.log(`Video ${i+1}/${totalVideos} progress: ${progress}%`);
+            }
+          }
+        );
+        
+        // Add to our results array
+        if (result) {
+          results.push(result);
+        }
+        
+        // Add to playlist if needed
+        if (localPlaylistId && result) {
+          try {
+            // Get the downloaded video ID from the database
+            const getVideoStmt = db.prepare('SELECT id FROM videos WHERE youtube_id = ?');
+            const dbVideo = getVideoStmt.get(videoId);
+            
+            if (dbVideo) {
+              // Add to playlist
+              const addToPlaylistStmt = db.prepare(`
+                INSERT INTO playlist_videos (playlist_id, video_id, position)
+                VALUES (?, ?, (
+                  SELECT COALESCE(MAX(position), 0) + 1
+                  FROM playlist_videos
+                  WHERE playlist_id = ?
+                ))
+              `);
+              
+              addToPlaylistStmt.run(localPlaylistId, dbVideo.id, localPlaylistId);
+              console.log(`Added video ${videoId} to playlist ${localPlaylistId}`);
+            }
+          } catch (err) {
+            console.error(`Error adding video to playlist: ${err.message}`);
+          }
+        }
+        
+        completed++;
+        
+        // Update progress in the database
+        const progress = Math.floor((completed / totalVideos) * 100);
+        const updateProgressStmt = db.prepare(`
+          UPDATE downloads SET progress = ?, playlist_complete = ? WHERE youtube_id = ?
+        `);
+        updateProgressStmt.run(progress, completed, playlistInfo.id);
+        
+        // Update callback
+        progressCallback(
+          playlistInfo.id,
+          totalVideos,
+          completed,
+          i+1 < videos.length ? (videos[i+1].title || videos[i+1].id) : null
+        );
+        
+      } catch (err) {
+        console.error(`Error downloading video ${videoId}:`, err);
+      }
+    }
+    
+    // Update download status to completed
+    const completeDownloadStmt = db.prepare(`
+      UPDATE downloads SET 
+      status = 'completed', 
+      progress = 100, 
+      date_completed = CURRENT_TIMESTAMP,
+      playlist_complete = ?
+      WHERE youtube_id = ?
+    `);
+    
+    completeDownloadStmt.run(completed, playlistInfo.id);
+    
+    // Final callback
+    progressCallback(
+      playlistInfo.id,
+      totalVideos,
+      completed,
+      null
+    );
+    
+    return {
+      id: playlistInfo.id,
+      title: playlistInfo.title,
+      totalVideos,
+      downloadedVideos: completed,
+      results
+    };
+    
+  } catch (error) {
+    console.error('Error downloading playlist:', error);
+    
+    // Update database with error
+    if (playlistInfo && playlistInfo.id) {
+      const updateErrorStmt = db.prepare(`
+        UPDATE downloads SET 
+        status = 'failed', 
+        error_message = ?, 
+        date_completed = CURRENT_TIMESTAMP
+        WHERE youtube_id = ?
+      `);
+      updateErrorStmt.run(error.message, playlistInfo.id);
+    }
+    
+    throw error;
+  }
+}
+
 export {
   downloadVideo,
   getVideoInfo,
@@ -731,5 +1144,7 @@ export {
   getActiveDownloads,
   getDownloadHistory,
   checkYtDlpInstalled,
-  ensureYtDlpReady
+  ensureYtDlpReady,
+  getPlaylistInfo,
+  downloadPlaylist
 };

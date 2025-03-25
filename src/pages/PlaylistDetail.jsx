@@ -170,16 +170,6 @@ const PlaylistDetail = () => {
           </div>
           
           <div className="flex gap-3">
-            {videos.length > 0 && (
-              <Link
-                to={`/video/${videos[0].id}`}
-                className="btn btn-primary flex items-center gap-2"
-              >
-                <PlayIcon className="w-5 h-5" />
-                Play All
-              </Link>
-            )}
-            
             <button
               className={`btn ${isEditMode ? 'btn-accent' : 'btn-outline'}`}
               onClick={toggleEditMode}

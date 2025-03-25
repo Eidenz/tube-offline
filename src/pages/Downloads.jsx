@@ -122,37 +122,40 @@ const Downloads = () => {
       {/* Active Downloads */}
       {activeTab === 'active' && (
         <>
-          {activeDownloads.length > 0 ? (
+          {activeDownloads.filter(download => !download.is_playlist).length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {activeDownloads.map(download => (
-                <motion.div 
-                  key={download.youtube_id} 
-                  className="relative group"
-                  variants={itemVariants}
-                >
-                  <VideoCard
-                    video={{
-                      youtube_id: download.youtube_id,
-                      title: download.title || 'Downloading...',
-                      channel: download.youtube_id,
-                      thumbnail_url: `https://i.ytimg.com/vi/${download.youtube_id}/mqdefault.jpg`,
-                      duration_formatted: '--:--'
-                    }}
-                    isDownloading={true}
-                    progress={download.progress || 0}
-                  />
-                  
-                  <button
-                    className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => handleCancelDownload(download.youtube_id)}
-                    aria-label="Cancel download"
+              {activeDownloads
+                .filter(download => !download.is_playlist) // Only show non-playlist downloads here
+                .map(download => (
+                  <motion.div 
+                    key={download.youtube_id} 
+                    className="relative group"
+                    variants={itemVariants}
                   >
-                    <XMarkIcon className="w-4 h-4" />
-                  </button>
-                </motion.div>
-              ))}
+                    <VideoCard
+                      video={{
+                        youtube_id: download.youtube_id,
+                        title: download.title || 'Downloading...',
+                        channel: download.youtube_id,
+                        thumbnail_url: `https://i.ytimg.com/vi/${download.youtube_id}/mqdefault.jpg`,
+                        duration_formatted: '--:--'
+                      }}
+                      isDownloading={true}
+                      progress={download.progress || 0}
+                    />
+                    
+                    <button
+                      className="absolute top-2 right-2 bg-red-500/80 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => handleCancelDownload(download.youtube_id)}
+                      aria-label="Cancel download"
+                    >
+                      <XMarkIcon className="w-4 h-4" />
+                    </button>
+                  </motion.div>
+                ))}
             </div>
-          ) : (
+          ) : activeDownloads.filter(download => download.is_playlist).length === 0 ? (
+            // Only show the "no active downloads" message if there are no playlists either
             <motion.div 
               className="flex flex-col items-center justify-center py-16 text-text-secondary"
               variants={itemVariants}
@@ -169,6 +172,56 @@ const Downloads = () => {
                 Start a Download
               </button>
             </motion.div>
+          ) : null}
+          {activeDownloads.filter(download => download.is_playlist).length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-4">Active Playlist Downloads</h3>
+              <div className="space-y-4">
+                {activeDownloads
+                  .filter(download => download.is_playlist)
+                  .map(download => (
+                    <div 
+                      key={`playlist-${download.youtube_id}`}
+                      className="bg-secondary rounded-lg p-4"
+                    >
+                      <div className="flex justify-between mb-3">
+                        <div>
+                          <h4 className="font-medium text-lg">{download.title || 'YouTube Playlist'}</h4>
+                          <p className="text-text-secondary text-sm">
+                            {download.playlist_complete || 0} of {download.playlist_size || '?'} videos downloaded
+                          </p>
+                        </div>
+                        <button
+                          className="p-1.5 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors"
+                          onClick={() => handleCancelDownload(download.youtube_id)}
+                          aria-label="Cancel download"
+                        >
+                          <XMarkIcon className="w-5 h-5" />
+                        </button>
+                      </div>
+                      
+                      <div className="relative pt-1">
+                        <div className="flex mb-2 items-center justify-between">
+                          <div>
+                            <span className="text-xs font-semibold inline-block text-accent">
+                              {`${Math.round(download.progress)}%`}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="overflow-hidden h-2 text-xs flex rounded bg-primary">
+                          <motion.div
+                            className="flex flex-col text-center whitespace-nowrap text-white justify-center bg-accent"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${download.progress}%` }}
+                            transition={{ duration: 0.5 }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
           )}
         </>
       )}

@@ -68,6 +68,12 @@ export const DownloadProvider = ({ children }) => {
           else if (data.type === 'download_completed') {
             // This is our new dedicated event that comes AFTER the video is in the database
             handleDownloadComplete(data.youtubeId, data.videoData);
+            
+            // Add this code to manually dispatch an event for refreshing the library
+            const refreshEvent = new CustomEvent('tube-offline-download-completed');
+            window.dispatchEvent(refreshEvent);
+            window.downloadCompletedAt = Date.now();
+            window.lastCompletedVideoId = data.youtubeId;
           } 
           else if (data.type === 'error') {
             handleDownloadError(data.youtubeId, data.error);
@@ -266,6 +272,41 @@ export const DownloadProvider = ({ children }) => {
     // Show error notification
     error(`Download failed: ${errorMessage}`);
   }, [error]);
+
+  const downloadPlaylist = useCallback(async (url, quality = '720', downloadSubtitles = true, localPlaylistId = null) => {
+    try {
+      const response = await axios.post(`${DOWNLOAD_API}/playlist`, {
+        url,
+        quality,
+        downloadSubtitles,
+        playlistId: localPlaylistId
+      });
+      
+      fetchActiveDownloads();
+      return response.data;
+    } catch (err) {
+      console.error('Failed to start playlist download:', err);
+      if (err.response?.status === 409) {
+        error('This playlist is already being downloaded');
+      } else {
+        error('Failed to start playlist download');
+      }
+      return false;
+    }
+  }, [success, error, fetchActiveDownloads]);
+  
+  const getPlaylistInfo = useCallback(async (url) => {
+    try {
+      const response = await axios.get(`${DOWNLOAD_API}/playlist-info`, {
+        params: { url }
+      });
+      return response.data;
+    } catch (err) {
+      console.error('Failed to get playlist info:', err);
+      error('Failed to fetch playlist information');
+      return null;
+    }
+  }, [error]);
   
   return (
     <DownloadContext.Provider
@@ -275,6 +316,8 @@ export const DownloadProvider = ({ children }) => {
         isLoading,
         isYtDlpInstalled,
         startDownload,
+        downloadPlaylist,
+        getPlaylistInfo,
         cancelDownload,
         getVideoInfo,
         fetchActiveDownloads,

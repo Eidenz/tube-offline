@@ -23,6 +23,8 @@ import { DownloadProvider } from './context/DownloadContext';
 
 // Components
 import NotificationToast from './components/ui/NotificationToast';
+import ScrollToTop from './components/ui/ScrollToTop';
+import LibraryRefreshPoller from './components/ui/LibraryRefreshPoller';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -97,6 +99,8 @@ function App() {
               </div>
               
               <NotificationToast />
+              <ScrollToTop />
+              <LibraryRefreshPoller />
             </div>
           </DownloadProvider>
         </LibraryProvider>

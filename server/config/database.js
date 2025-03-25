@@ -135,6 +135,34 @@ function initializeDatabase() {
         CREATE INDEX IF NOT EXISTS idx_favorites_video_id ON favorites(video_id);
         CREATE INDEX IF NOT EXISTS idx_favorites_date_added ON favorites(date_added);
       `);
+
+      // Add playlist-related fields to downloads table if they don't exist
+      try {
+        // Check if the columns exist
+        const checkColumns = db.prepare(`PRAGMA table_info(downloads)`).all();
+        const columns = checkColumns.map(col => col.name);
+        
+        // Add is_playlist column if it doesn't exist
+        if (!columns.includes('is_playlist')) {
+          db.exec(`ALTER TABLE downloads ADD COLUMN is_playlist BOOLEAN DEFAULT 0`);
+          console.log('Added is_playlist column to downloads table');
+        }
+        
+        // Add playlist_size column if it doesn't exist
+        if (!columns.includes('playlist_size')) {
+          db.exec(`ALTER TABLE downloads ADD COLUMN playlist_size INTEGER DEFAULT 0`);
+          console.log('Added playlist_size column to downloads table');
+        }
+        
+        // Add playlist_complete column if it doesn't exist
+        if (!columns.includes('playlist_complete')) {
+          db.exec(`ALTER TABLE downloads ADD COLUMN playlist_complete INTEGER DEFAULT 0`);
+          console.log('Added playlist_complete column to downloads table');
+        }
+      } catch (error) {
+        console.error('Error updating downloads table schema:', error);
+        // Continue initialization even if this fails
+      }
       
       console.log('Database schema initialized successfully');
       resolve();

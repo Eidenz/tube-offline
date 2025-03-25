@@ -250,7 +250,6 @@ export const LibraryProvider = ({ children }) => {
       // Update the local state
       setPlaylists(prevPlaylists => [...prevPlaylists, newPlaylist]);
       
-      success('Playlist created successfully');
       return newPlaylist;
     } catch (err) {
       console.error('Failed to create playlist:', err);
@@ -440,12 +439,27 @@ export const LibraryProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Make the refreshLibrary function available globally for direct access from DownloadContext
-    window.libraryContext = { refreshLibrary };
+    const refreshVideoDownloadHandler = () => {
+      console.log('Download completion event detected, refreshing library');
+      refreshLibrary();
+    };
+    
+    // Listen for download completion via custom event
+    window.addEventListener('tube-offline-download-completed', refreshVideoDownloadHandler);
+    
+    // Set up a periodic check for the global variables that are set by the server
+    const periodicCheck = setInterval(() => {
+      if (window.downloadCompletedAt && 
+          window.lastCompletedAt !== window.downloadCompletedAt) {
+        console.log('Download completion detected via global variables, refreshing library');
+        refreshLibrary();
+        window.lastCompletedAt = window.downloadCompletedAt;
+      }
+    }, 2000); // Check every 2 seconds
     
     return () => {
-      // Clean up
-      delete window.libraryContext;
+      window.removeEventListener('tube-offline-download-completed', refreshVideoDownloadHandler);
+      clearInterval(periodicCheck);
     };
   }, [refreshLibrary]);
   
