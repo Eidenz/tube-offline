@@ -1,7 +1,9 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ClockIcon, ArrowPathIcon, CheckCircleIcon, FilmIcon, CalendarIcon } from '@heroicons/react/24/outline';
-import { useMemo } from 'react';
+import { ArrowPathIcon, CheckCircleIcon, FilmIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
+import { useLibrary } from '../../context/LibraryContext';
+import { useState, useEffect, useMemo } from 'react';
 
 // Helper function to determine video quality from metadata
 function getVideoQuality(metadata) {
@@ -71,6 +73,21 @@ const VideoCard = ({ video, isDownloading = false, progress = 0 }) => {
     date_added,
     metadata
   } = video;
+
+  const { isFavorite } = useLibrary();
+  const [isFavoriteVideo, setIsFavoriteVideo] = useState(false);
+
+  // Check if the video is a favorite
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (video?.id) {
+        const status = await isFavorite(video.id);
+        setIsFavoriteVideo(status);
+      }
+    };
+    
+    checkFavoriteStatus();
+  }, [video, isFavorite]);
 
   // Try to get the publication date from metadata
   const getPublishedDate = () => {
@@ -194,6 +211,13 @@ const VideoCard = ({ video, isDownloading = false, progress = 0 }) => {
             loading="lazy"
           />
           <div className="duration">{duration_formatted}</div>
+          
+          {/* Favorite Icon */}
+          {isFavoriteVideo && (
+            <div className="absolute top-2 right-2">
+              <HeartIconSolid className="w-5 h-5 text-red-500 drop-shadow-md" />
+            </div>
+          )}
           
           {/* Video quality badge - show on hover */}
           {videoQuality && (

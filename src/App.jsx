@@ -14,6 +14,7 @@ import Playlists from './pages/Playlists';
 import PlaylistDetail from './pages/PlaylistDetail';
 import SearchResults from './pages/SearchResults';
 import Tags from './pages/Tags';
+import Favorites from './pages/Favorites';
 
 // Context
 import { NotificationProvider } from './context/NotificationContext';
@@ -74,12 +75,12 @@ function App() {
         <LibraryProvider>
           <DownloadProvider>
             <div className="flex flex-col h-screen bg-primary text-text-primary">
-              <Header toggleSidebar={toggleSidebar} />
+              <Header />
               
-              <div className="flex flex-1 overflow-hidden pt-header">
+              <div className="flex flex-1 overflow-hidden">
                 <Sidebar isOpen={isSidebarOpen} />
                 
-                <main className="flex-1 overflow-y-auto">
+                <main className="flex-1 overflow-y-auto pt-header">
                   <AnimatePresence mode="wait">
                     <Routes>
                       <Route path="/" element={<Home />} />
@@ -89,6 +90,7 @@ function App() {
                       <Route path="/playlist/:id" element={<PlaylistDetail />} />
                       <Route path="/tags" element={<Tags />} />
                       <Route path="/search" element={<SearchResults />} />
+                      <Route path="/favorites" element={<Favorites />} />
                     </Routes>
                   </AnimatePresence>
                 </main>

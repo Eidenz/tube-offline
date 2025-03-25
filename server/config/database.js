@@ -114,6 +114,16 @@ function initializeDatabase() {
           FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
         )
       `);
+
+      // Create favorites table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS favorites (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          video_id INTEGER UNIQUE NOT NULL,
+          date_added TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE
+        )
+      `);
       
       // Add indexes for better performance
       db.exec(`
@@ -122,6 +132,8 @@ function initializeDatabase() {
         CREATE INDEX IF NOT EXISTS idx_downloads_status ON downloads(status);
         CREATE INDEX IF NOT EXISTS idx_history_video_id ON history(video_id);
         CREATE INDEX IF NOT EXISTS idx_history_watched_at ON history(watched_at);
+        CREATE INDEX IF NOT EXISTS idx_favorites_video_id ON favorites(video_id);
+        CREATE INDEX IF NOT EXISTS idx_favorites_date_added ON favorites(date_added);
       `);
       
       console.log('Database schema initialized successfully');

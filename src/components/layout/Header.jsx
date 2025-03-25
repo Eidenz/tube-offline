@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bars3Icon, XMarkIcon, MagnifyingGlassIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/solid';
 import DownloadModal from '../downloads/DownloadModal';
 
-const Header = ({ toggleSidebar }) => {
+const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -18,75 +17,39 @@ const Header = ({ toggleSidebar }) => {
     }
   };
 
-  const toggleSidebarVisibility = () => {
-    setIsSidebarVisible(!isSidebarVisible);
-    toggleSidebar();
-  };
-
   return (
-    <header className="h-header bg-secondary fixed top-0 left-0 w-full flex items-center justify-between px-6 z-50 shadow-header">
-      <div className="flex items-center">
-        <button
-          onClick={toggleSidebarVisibility}
-          className="mr-4 text-text-primary hover:text-accent transition-colors"
-          aria-label="Toggle sidebar"
-        >
-          {isSidebarVisible ? (
-            <Bars3Icon className="w-6 h-6" />
-          ) : (
-            <XMarkIcon className="w-6 h-6" />
-          )}
-        </button>
-        
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-          <motion.div
-            initial={{ rotate: 0 }}
-            whileHover={{ rotate: 10, scale: 1.1 }}
-            transition={{ duration: 0.2 }}
-            className="text-accent"
-          >
-            <ArrowDownTrayIcon className="w-6 h-6" />
-          </motion.div>
-          <span>TubeOffline</span>
-        </Link>
-      </div>
+    <header className="h-header fixed top-0 left-0 w-full flex items-center justify-between px-6 z-40 bg-transparent">
+      {/* Empty div to balance the header (where sidebar toggle used to be) */}
+      <div className="w-10"></div>
       
-      <form onSubmit={handleSubmit} className="flex-1 max-w-xl mx-6">
+      {/* Search form */}
+      <form onSubmit={handleSubmit} className="flex-1 max-w-xl mx-4">
         <div className="flex items-center">
           <input
             type="text"
             placeholder="Search your offline library..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
+            className="search-input bg-secondary/60 backdrop-blur-sm focus:bg-secondary/80 transition-all"
           />
-          <button type="submit" className="search-button">
+          <button type="submit" className="search-button bg-secondary/60 backdrop-blur-sm hover:bg-secondary/80">
             <MagnifyingGlassIcon className="w-5 h-5 mx-auto" />
           </button>
         </div>
       </form>
       
-      <div className="flex items-center gap-6">
-        <motion.button
-          className="relative flex items-center justify-center w-10 h-10 bg-accent/10 text-accent rounded-full"
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          onClick={() => setIsDownloadModalOpen(true)}
-          aria-label="Download video"
-        >
-          <ArrowDownTrayIcon className="w-5 h-5" />
-        </motion.button>
-        
-        <motion.button
-          className="text-text-primary"
-          whileHover={{ rotate: 45, scale: 1.1 }}
-          transition={{ duration: 0.2 }}
-          aria-label="Settings"
-        >
-          <Cog6ToothIcon className="w-6 h-6" />
-        </motion.button>
-      </div>
+      {/* Download button */}
+      <motion.button
+        className="relative flex items-center justify-center w-10 h-10 bg-accent/80 backdrop-blur-sm text-white rounded-full"
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setIsDownloadModalOpen(true)}
+        aria-label="Download video"
+      >
+        <ArrowDownTrayIcon className="w-5 h-5" />
+      </motion.button>
       
+      {/* Download Modal */}
       {isDownloadModalOpen && (
         <DownloadModal 
           isOpen={isDownloadModalOpen} 

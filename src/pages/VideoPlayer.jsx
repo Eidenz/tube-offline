@@ -20,6 +20,12 @@ import { useNotification } from '../context/NotificationContext';
 import VideoCard from '../components/video/VideoCard';
 import VideoQualityBadge from '../components/video/VideoQualityBadge';
 
+const YouTubeIcon = () => (
+  <svg className="w-6 h-6 text-red-600" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.615 3.184c-3.604-.246-11.631-.245-15.23 0-3.897.266-4.356 2.62-4.385 8.816.029 6.185.484 8.549 4.385 8.816 3.6.245 11.626.246 15.23 0 3.897-.266 4.356-2.62 4.385-8.816-.029-6.185-.484-8.549-4.385-8.816zm-10.615 12.816v-8l8 3.993-8 4.007z"/>
+  </svg>
+);
+
 const VideoPlayer = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -49,6 +55,11 @@ const VideoPlayer = () => {
     deleteVideo
   } = useLibrary();
   const { success, error } = useNotification();
+
+  const getYoutubeUrl = () => {
+    if (!video || !video.youtube_id) return null;
+    return `https://www.youtube.com/watch?v=${video.youtube_id}`;
+  };
   
   // Fetch video data
   useEffect(() => {
@@ -307,6 +318,19 @@ const VideoPlayer = () => {
               )}
               <span className="text-xs text-text-secondary">Favorite</span>
             </motion.button>
+            
+            {/* Add the YouTube Link button here */}
+            <motion.a
+              href={getYoutubeUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-secondary transition-all"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <YouTubeIcon />
+              <span className="text-xs text-text-secondary">YouTube</span>
+            </motion.a>
             
             <motion.button
               className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-secondary transition-all"

@@ -57,7 +57,6 @@ const Favorites = () => {
     try {
       await removeFromFavorites(videoId);
       setFavoriteVideos(favoriteVideos.filter(video => video.id !== videoId));
-      success('Video removed from favorites');
     } catch (err) {
       console.error('Failed to remove from favorites:', err);
       error('Failed to remove video from favorites');

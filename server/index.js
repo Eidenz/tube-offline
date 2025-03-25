@@ -17,6 +17,7 @@ import videoRoutes from './routes/videoRoutes.js';
 import { router as downloadRoutes } from './routes/downloadRoutes.js';
 import playlistRoutes from './routes/playlistRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
+import favoriteRoutes from './routes/favoriteRoutes.js';
 
 // Get current directory (ES Module equivalent of __dirname)
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +53,7 @@ app.use('/api/videos', videoRoutes);
 app.use('/api/download', downloadRoutes);
 app.use('/api/playlists', playlistRoutes);
 app.use('/api/search', searchRoutes);
+app.use('/api/favorites', favoriteRoutes);
 
 // Serve index.html for all routes in production (for SPA support)
 if (process.env.NODE_ENV === 'production') {

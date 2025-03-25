@@ -5,20 +5,24 @@ import {
   FilmIcon, 
   ArrowDownTrayIcon, 
   QueueListIcon,
-  TagIcon
+  TagIcon,
+  HeartIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { FilmIcon as FilmIconSolid, 
   ArrowDownTrayIcon as ArrowDownTrayIconSolid, 
   QueueListIcon as QueueListIconSolid, 
-  TagIcon as TagIconSolid } from '@heroicons/react/24/solid';
+  TagIcon as TagIconSolid,
+  HeartIcon as HeartIconSolid } from '@heroicons/react/24/solid';
 import { useDownload } from '../../context/DownloadContext';
 
 // Memoized NavItem component to prevent unnecessary re-renders
-const NavItem = memo(({ to, icon, activeIcon, label, badge = null }) => (
+const NavItem = memo(({ to, icon, activeIcon, label, badge = null, isCollapsed }) => (
   <NavLink 
     to={to}
     className={({ isActive }) => 
-      `sidebar-item group ${isActive ? 'active' : ''}`
+      `sidebar-item group ${isActive ? 'active' : ''} ${isCollapsed ? 'justify-center' : ''}`
     }
   >
     {({ isActive }) => (
@@ -44,9 +48,11 @@ const NavItem = memo(({ to, icon, activeIcon, label, badge = null }) => (
           )}
         </div>
         
-        <span className={`font-medium transition-colors ${isActive ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
-          {label}
-        </span>
+        {!isCollapsed && (
+          <span className={`font-medium transition-colors ${isActive ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
+            {label}
+          </span>
+        )}
       </>
     )}
   </NavLink>
@@ -58,6 +64,8 @@ const Sidebar = ({ isOpen }) => {
   const downloadCountRef = useRef(0);
   // Use state only for forcing a re-render when necessary
   const [downloadCount, setDownloadCount] = useState(0);
+  // Add state for collapsed sidebar
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Create a separate effect for monitoring active downloads
   // This will run outside the render cycle
@@ -87,16 +95,27 @@ const Sidebar = ({ isOpen }) => {
     return () => clearInterval(intervalId);
   }, []);
 
+  // Toggle collapsed state
+  const toggleCollapsed = () => {
+    setIsCollapsed(!isCollapsed);
+  };
+
   const sidebarVariants = {
-    open: { width: 240, opacity: 1 },
-    closed: { width: 0, opacity: 0 }
+    open: { 
+      width: isCollapsed ? 80 : 240, 
+      opacity: 1 
+    },
+    closed: { 
+      width: 0, 
+      opacity: 0 
+    }
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="bg-secondary h-full overflow-hidden shadow-xl relative"
+          className="bg-secondary h-screen overflow-hidden shadow-xl relative z-50"
           initial="closed"
           animate="open"
           exit="closed"
@@ -104,15 +123,37 @@ const Sidebar = ({ isOpen }) => {
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
           <div className="flex flex-col h-full">
+            {/* Toggle collapse button */}
+            <div className="flex justify-end pt-4 pr-4">
+              <button 
+                onClick={toggleCollapsed}
+                className="p-2 rounded-full bg-secondary/80 hover:bg-accent/20 text-text-secondary hover:text-accent transition-colors"
+              >
+                {isCollapsed ? (
+                  <ChevronRightIcon className="w-5 h-5" />
+                ) : (
+                  <ChevronLeftIcon className="w-5 h-5" />
+                )}
+              </button>
+            </div>
             
             {/* Main navigation */}
-            <div className="flex-1 overflow-y-auto pt-6 pb-4 px-4 sidebar-content">
+            <div className="flex-1 overflow-y-auto pt-2 pb-4 px-4 sidebar-content">
               <div className="space-y-1">
                 <NavItem 
                   to="/" 
                   icon={<FilmIcon className="w-6 h-6" />}
                   activeIcon={<FilmIconSolid className="w-6 h-6" />}
                   label="Library" 
+                  isCollapsed={isCollapsed}
+                />
+
+                <NavItem 
+                  to="/favorites" 
+                  icon={<HeartIcon className="w-6 h-6" />}
+                  activeIcon={<HeartIconSolid className="w-6 h-6" />}
+                  label="Favorites" 
+                  isCollapsed={isCollapsed}
                 />
                 
                 <NavItem 
@@ -121,6 +162,7 @@ const Sidebar = ({ isOpen }) => {
                   activeIcon={<ArrowDownTrayIconSolid className="w-6 h-6" />}
                   label="Downloads" 
                   badge={downloadCount || null}
+                  isCollapsed={isCollapsed}
                 />
                 
                 <NavItem 
@@ -128,6 +170,7 @@ const Sidebar = ({ isOpen }) => {
                   icon={<QueueListIcon className="w-6 h-6" />}
                   activeIcon={<QueueListIconSolid className="w-6 h-6" />}
                   label="Playlists" 
+                  isCollapsed={isCollapsed}
                 />
                 
                 <NavItem 
@@ -135,14 +178,17 @@ const Sidebar = ({ isOpen }) => {
                   icon={<TagIcon className="w-6 h-6" />}
                   activeIcon={<TagIconSolid className="w-6 h-6" />}
                   label="Tags" 
+                  isCollapsed={isCollapsed}
                 />
               </div>
             </div>
             
             {/* Bottom section with version info */}
-            <div className="pt-4 pb-6 px-6 text-xs text-text-secondary/50 border-t border-[#3f3f3f]/30">
-              <p>TubeOffline v1</p>
-            </div>
+            {!isCollapsed && (
+              <div className="pt-4 pb-6 px-6 text-xs text-text-secondary/50 border-t border-[#3f3f3f]/30">
+                <p>TubeOffline v1</p>
+              </div>
+            )}
           </div>
           
           {/* Right edge glow effect */}
