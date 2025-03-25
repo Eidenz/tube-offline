@@ -82,10 +82,51 @@ const Home = () => {
   };
   
   // Handle load more button click
-  const handleLoadMore = () => {
-    // Increase display count by 20 (5 rows of 4 videos)
-    setDisplayCount(prevCount => prevCount + 20);
+  const handleLoadMore = async () => {
+    // If we have more videos in the filtered list, just show more of them
+    if (filteredVideos.length > visibleVideos.length) {
+      // Increase display count by 20 (5 rows of 4 videos)
+      setDisplayCount(prevCount => prevCount + 20);
+    } 
+    // Otherwise, if there are more videos to fetch from the API, fetch them
+    else if (pagination.hasMore && !isLoading) {
+      setIsLoading(true);
+      try {
+        if (selectedCategory === 'all') {
+          // For all category, fetch more videos
+          const result = await fetchVideos(pagination.limit, pagination.offset + pagination.limit);
+          if (result && result.videos) {
+            setFilteredVideos(prev => [...prev, ...result.videos]);
+          }
+        } else {
+          // For specific tag, search with that tag and load more
+          const result = await searchVideos(
+            selectedCategory, 
+            'tag', 
+            pagination.limit, 
+            pagination.offset + pagination.limit
+          );
+          if (result && result.videos) {
+            setFilteredVideos(prev => [...prev, ...result.videos]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load more videos:', err);
+      } finally {
+        // Update display count to show all videos loaded so far
+        setDisplayCount(prev => prev + pagination.limit);
+        setIsLoading(false);
+      }
+    }
   };
+
+  // Update display count when pagination changes
+  useEffect(() => {
+    // When new videos are loaded, update the display count to show them
+    if (filteredVideos.length > displayCount) {
+      setDisplayCount(filteredVideos.length);
+    }
+  }, [pagination, filteredVideos.length]);
   
   // Only show videos up to the current display count
   const visibleVideos = filteredVideos.slice(0, displayCount);
@@ -161,7 +202,7 @@ const Home = () => {
             </div>
             
             {/* Load More Button */}
-            {filteredVideos.length > visibleVideos.length && (
+            {(filteredVideos.length > visibleVideos.length || pagination.hasMore) && (
               <div className="mt-10 flex justify-center">
                 <motion.button
                   className="px-6 py-3 bg-secondary hover:bg-secondary/80 text-text-primary rounded-lg flex items-center gap-2"
