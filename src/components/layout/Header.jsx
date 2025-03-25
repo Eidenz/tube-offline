@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -8,7 +8,22 @@ import DownloadModal from '../downloads/DownloadModal';
 const Header = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
+
+  // Track scroll position
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 10) {
+        setIsScrolled(true);
+      } else {
+        setIsScrolled(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -18,7 +33,11 @@ const Header = () => {
   };
 
   return (
-    <header className="h-header fixed top-0 left-0 w-full flex items-center justify-between px-6 z-40 bg-transparent">
+    <header 
+      className={`h-header fixed top-0 left-0 w-full flex items-center justify-between px-6 z-40 transition-colors duration-300 ${
+        isScrolled ? 'bg-secondary/95 backdrop-blur-sm shadow-header' : 'bg-transparent'
+      }`}
+    >
       {/* Empty div to balance the header (where sidebar toggle used to be) */}
       <div className="w-10"></div>
       
@@ -30,9 +49,16 @@ const Header = () => {
             placeholder="Search your offline library..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input bg-secondary/60 backdrop-blur-sm focus:bg-secondary/80 transition-all"
+            className={`search-input transition-all ${
+              isScrolled ? 'bg-primary/80' : 'bg-secondary/60 backdrop-blur-sm'
+            }`}
           />
-          <button type="submit" className="search-button bg-secondary/60 backdrop-blur-sm hover:bg-secondary/80">
+          <button 
+            type="submit" 
+            className={`search-button transition-all ${
+              isScrolled ? 'bg-primary/80' : 'bg-secondary/60 backdrop-blur-sm'
+            }`}
+          >
             <MagnifyingGlassIcon className="w-5 h-5 mx-auto" />
           </button>
         </div>

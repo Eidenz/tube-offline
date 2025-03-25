@@ -194,20 +194,22 @@ const SearchResults = () => {
           {/* Load more button */}
           {pagination.hasMore && (
             <div className="flex justify-center mt-8">
-              <button
-                className="btn btn-outline"
+              <motion.button
+                className="px-6 py-3 bg-secondary hover:bg-secondary/80 text-text-primary rounded-lg flex items-center gap-2"
                 onClick={loadMoreResults}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 disabled={isLoading}
               >
                 {isLoading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-text-primary"></span>
+                  <>
+                    <span className="h-5 w-5 rounded-full border-2 border-accent border-t-transparent animate-spin"></span>
                     Loading...
-                  </span>
+                  </>
                 ) : (
                   'Load More'
                 )}
-              </button>
+              </motion.button>
             </div>
           )}
         </div>

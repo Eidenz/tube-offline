@@ -4,8 +4,6 @@ import { FilmIcon } from '@heroicons/react/24/outline';
 import { useLibrary } from '../context/LibraryContext';
 import VideoCard from '../components/video/VideoCard';
 import CategoryPills from '../components/ui/CategoryPills';
-import { useInView } from 'react-intersection-observer';
-import axios from 'axios';
 
 const Home = () => {
   const { videos, fetchVideos, pagination, isLoading, searchVideos, getTopTags } = useLibrary();
@@ -13,12 +11,7 @@ const Home = () => {
   const [filteredVideos, setFilteredVideos] = useState([]);
   const [topTags, setTopTags] = useState([]);
   const [isLoadingTags, setIsLoadingTags] = useState(true);
-  
-  // Setup intersection observer for infinite scroll
-  const { ref, inView } = useInView({
-    threshold: 0.1,
-    triggerOnce: false
-  });
+  const [displayCount, setDisplayCount] = useState(20); // Display 20 videos initially (5 rows of 4)
   
   // Fetch top tags on mount
   useEffect(() => {
@@ -49,37 +42,24 @@ const Home = () => {
     fetchTopTags();
   }, [getTopTags]);
   
-  // Load more videos when the user scrolls to the bottom
-  useEffect(() => {
-    if (inView && pagination.hasMore && !isLoading) {
-      if (selectedCategory === 'all') {
-        fetchVideos(pagination.limit, pagination.offset + pagination.limit);
-      } else {
-        // If a tag is selected, we need to search for more videos with that tag
-        searchVideos(
-          selectedCategory, 
-          'tag',
-          pagination.limit, 
-          pagination.offset + pagination.limit
-        ).then(result => {
-          if (result && result.videos) {
-            setFilteredVideos(prev => [...prev, ...result.videos]);
-          }
-        });
-      }
-    }
-  }, [inView, pagination, isLoading, fetchVideos, selectedCategory, searchVideos]);
-  
-  // Filter videos based on selected category/tag
+  // Load videos when category changes or on initial load
   useEffect(() => {
     const filterByTag = async () => {
       if (selectedCategory === 'all') {
-        setFilteredVideos(videos);
+        // For all category, fetch initial videos with a limit of at least displayCount
+        try {
+          const result = await fetchVideos(Math.max(20, displayCount), 0);
+          if (result && result.videos) {
+            setFilteredVideos(result.videos);
+          }
+        } catch (err) {
+          console.error('Failed to fetch videos:', err);
+        }
       } else {
+        // For specific tag, search with that tag
         setIsLoading(true);
         try {
-          // Use searchVideos to filter by the selected tag
-          const result = await searchVideos(selectedCategory, 'tag');
+          const result = await searchVideos(selectedCategory, 'tag', Math.max(20, displayCount), 0);
           if (result && result.videos) {
             setFilteredVideos(result.videos);
           } else {
@@ -95,12 +75,23 @@ const Home = () => {
     };
     
     filterByTag();
-  }, [selectedCategory, videos, searchVideos]);
+  }, [selectedCategory, fetchVideos, searchVideos, displayCount]);
   
   // Handle category change
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
+    // Reset display count when category changes
+    setDisplayCount(20);
   };
+  
+  // Handle load more button click
+  const handleLoadMore = () => {
+    // Increase display count by 20 (5 rows of 4 videos)
+    setDisplayCount(prevCount => prevCount + 20);
+  };
+  
+  // Only show videos up to the current display count
+  const visibleVideos = filteredVideos.slice(0, displayCount);
   
   // Page animation variants
   const pageVariants = {
@@ -123,7 +114,7 @@ const Home = () => {
       transition: { duration: 0.5 }
     }
   };
-  
+
   return (
     <motion.div 
       className="container mx-auto px-6 pt-6 pb-24"
@@ -152,7 +143,7 @@ const Home = () => {
           )}
         </div>
         
-        {isLoading && filteredVideos.length === 0 ? (
+        {isLoading && visibleVideos.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, index) => (
               <div key={index} className="video-card animate-pulse">
@@ -164,14 +155,38 @@ const Home = () => {
               </div>
             ))}
           </div>
-        ) : filteredVideos.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredVideos.map(video => (
-              <VideoCard key={video.id} video={video} />
-            ))}
-          </div>
+        ) : visibleVideos.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {visibleVideos.map(video => (
+                <VideoCard key={video.id} video={video} />
+              ))}
+            </div>
+            
+            {/* Load More Button */}
+            {filteredVideos.length > visibleVideos.length && (
+              <div className="mt-10 flex justify-center">
+                <motion.button
+                  className="px-6 py-3 bg-secondary hover:bg-secondary/80 text-text-primary rounded-lg flex items-center gap-2"
+                  onClick={handleLoadMore}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <span className="h-5 w-5 rounded-full border-2 border-accent border-t-transparent animate-spin"></span>
+                      Loading...
+                    </>
+                  ) : (
+                    'Load More'
+                  )}
+                </motion.button>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-text-secondary">
+          <div className="flex flex-col items-center justify-center py-16 text-text-secondary">
             <FilmIcon className="w-16 h-16 mb-4 opacity-30" />
             <h3 className="text-xl font-medium mb-2">No videos found</h3>
             <p className="text-center max-w-md">
@@ -179,23 +194,6 @@ const Home = () => {
                 ? "Your library is empty. Download some videos to get started!"
                 : `No videos found with the tag "${selectedCategory}". Try selecting a different category.`}
             </p>
-          </div>
-        )}
-        
-        {/* Loading more indicator */}
-        {pagination.hasMore && !isLoading && (
-          <div 
-            ref={ref}
-            className="flex justify-center items-center py-8"
-          >
-            <div className="animate-pulse w-8 h-8 bg-accent/20 rounded-full"></div>
-          </div>
-        )}
-        
-        {/* Loading indicator while fetching more */}
-        {isLoading && filteredVideos.length > 0 && (
-          <div className="flex justify-center items-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
           </div>
         )}
       </motion.section>
