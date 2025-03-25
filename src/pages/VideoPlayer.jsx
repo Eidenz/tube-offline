@@ -352,6 +352,80 @@ const VideoPlayer = () => {
     setIsPlaylistCollapsed(!isPlaylistCollapsed);
   };
 
+  const findRelatedVideos = useCallback(async (currentVideo) => {
+    if (!currentVideo || !currentVideo.tags || currentVideo.tags.length === 0) {
+      // If no tags, just return recent videos as fallback
+      return videos.filter(v => v.id !== currentVideo.id).slice(0, 6);
+    }
+    
+    try {
+      // Extract tag IDs from the current video
+      const currentVideoTagIds = currentVideo.tags.map(tag => tag.id);
+      
+      // Create an array to store videos with their similarity scores
+      const videosWithScores = [];
+      
+      // Calculate similarity scores for all videos
+      for (const vid of videos) {
+        // Skip the current video
+        if (vid.id === currentVideo.id) continue;
+        
+        // Get tags for this video
+        let videoTags = [];
+        try {
+          // Try to fetch the video details to get its tags
+          const response = await axios.get(`/api/videos/${vid.id}`);
+          if (response.data && response.data.tags) {
+            videoTags = response.data.tags;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch tags for video ${vid.id}:`, err);
+          // Continue with empty tags if fetch fails
+        }
+        
+        // Count shared tags
+        const videoTagIds = videoTags.map(tag => tag.id);
+        const sharedTags = videoTagIds.filter(tagId => currentVideoTagIds.includes(tagId));
+        const similarityScore = sharedTags.length;
+        
+        // Only include videos that share at least one tag
+        if (similarityScore > 0) {
+          videosWithScores.push({
+            video: vid,
+            score: similarityScore,
+            sharedTags
+          });
+        }
+      }
+      
+      // Sort by similarity score (highest first)
+      videosWithScores.sort((a, b) => b.score - a.score);
+      
+      // Get the top 6 related videos
+      const topRelated = videosWithScores.slice(0, 6).map(item => ({
+        ...item.video,
+        sharedTags: item.sharedTags ? currentVideo.tags.filter(tag => 
+          item.sharedTags.includes(tag.id)
+        ) : []
+      }));
+      
+      return topRelated;
+    } catch (error) {
+      console.error("Error finding related videos:", error);
+      // Fallback to recent videos
+      return videos.filter(v => v.id !== currentVideo.id).slice(0, 6);
+    }
+  }, [videos]);
+
+  useEffect(() => {
+    if (video) {
+      // Find related videos when the current video loads
+      findRelatedVideos(video).then(related => {
+        setRelatedVideos(related);
+      });
+    }
+  }, [video, findRelatedVideos]);
+
   useEffect(() => {
     // Set up volume change listener after the player is mounted
     const setupVolumeListener = () => {
@@ -732,8 +806,25 @@ const VideoPlayer = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: 0.1 * index }}
+                  className="group"
                 >
                   <VideoCard video={relatedVideo} />
+                  
+                  {/* Show shared tags if any */}
+                  {relatedVideo.sharedTags && relatedVideo.sharedTags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {relatedVideo.sharedTags.slice(0, 3).map(tag => (
+                        <span key={tag.id} className="text-xs bg-accent/10 text-accent px-2 py-1 rounded-full">
+                          {tag.name}
+                        </span>
+                      ))}
+                      {relatedVideo.sharedTags.length > 3 && (
+                        <span className="text-xs bg-secondary/50 text-text-secondary px-2 py-1 rounded-full">
+                          +{relatedVideo.sharedTags.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </div>
