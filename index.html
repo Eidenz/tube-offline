@@ -4,6 +4,10 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/tube-offline-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Add base tag to ensure relative paths work correctly -->
+    <base href="/" />
+    <!-- Force HTTP -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests; block-all-mixed-content;" />
     <title>TubeOffline - Your Offline Video Library</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

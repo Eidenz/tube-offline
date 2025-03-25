@@ -1,0 +1,3 @@
+RewriteEngine Off
+# Disable SSL redirects
+Header unset Strict-Transport-Security

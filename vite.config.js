@@ -30,4 +30,19 @@ export default defineConfig({
       },
     },
   },
+  preview: {
+    port: 5000,
+    https: false, // Explicitly disable HTTPS
+  },
+  build: {
+    // Ensure assets use relative paths
+    assetsDir: 'assets',
+    rollupOptions: {
+      output: {
+        assetFileNames: 'assets/[name]-[hash][extname]',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+      },
+    },
+  },
 })

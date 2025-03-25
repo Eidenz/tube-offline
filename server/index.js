@@ -31,6 +31,7 @@ const PORT = config.port;
 app.use(cors());
 app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP for development
+  hsts: false, // Disable HTTP Strict Transport Security
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -86,7 +87,8 @@ initializeDatabase()
     
     // Start server
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`Server running on HTTP at http://localhost:${PORT}`);
+      console.log(`Server running on HTTP at http://${getLocalIP()}:${PORT}`);
       console.log(`WebSocket server available at ws://localhost:${PORT}/ws`);
       console.log(`Video data directory: ${config.videosDir}`);
       console.log(`Database path: ${config.dbPath}`);
@@ -96,3 +98,19 @@ initializeDatabase()
     console.error('Failed to initialize database:', err);
     process.exit(1);
   });
+
+  function getLocalIP() {
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    
+    for (const name of Object.keys(nets)) {
+      for (const net of nets[name]) {
+        // Skip over non-IPv4 and internal (loopback) addresses
+        if (net.family === 'IPv4' && !net.internal) {
+          return net.address;
+        }
+      }
+    }
+    
+    return 'localhost'; // Fallback
+  }
