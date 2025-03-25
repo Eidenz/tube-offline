@@ -14,7 +14,6 @@ An elegant offline YouTube video library using YT-DLP with a React frontend and 
 - [Production Build](#production-build)
 - [Configuration](#configuration)
 - [Updating](#updating)
-- [System Requirements](#system-requirements)
 - [Tech Stack](#tech-stack)
 - [License](#license)
 
