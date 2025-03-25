@@ -41,6 +41,8 @@ For any issues or questions, consider consulting online resources, community for
 - High-quality video playback with subtitle support
 - Real-time download progress updates
 - Search functionality for your offline library
+- Theme switcher with light and dark mode
+- Keyboard shortcuts for playback control
 
 ## Running with Docker (Recommended)
 
