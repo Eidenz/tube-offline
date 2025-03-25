@@ -352,6 +352,7 @@ const VideoPlayer = () => {
     setIsPlaylistCollapsed(!isPlaylistCollapsed);
   };
 
+  // Updated findRelatedVideos function with case-insensitive tag comparison
   const findRelatedVideos = useCallback(async (currentVideo) => {
     if (!currentVideo || !currentVideo.tags || currentVideo.tags.length === 0) {
       // If no tags, just return recent videos as fallback
@@ -359,8 +360,9 @@ const VideoPlayer = () => {
     }
     
     try {
-      // Extract tag IDs from the current video
+      // Extract tag information from the current video
       const currentVideoTagIds = currentVideo.tags.map(tag => tag.id);
+      const currentVideoTagNames = currentVideo.tags.map(tag => tag.name.toLowerCase()); // Lowercase for case-insensitive comparison
       
       // Create an array to store videos with their similarity scores
       const videosWithScores = [];
@@ -383,17 +385,31 @@ const VideoPlayer = () => {
           // Continue with empty tags if fetch fails
         }
         
-        // Count shared tags
-        const videoTagIds = videoTags.map(tag => tag.id);
-        const sharedTags = videoTagIds.filter(tagId => currentVideoTagIds.includes(tagId));
-        const similarityScore = sharedTags.length;
+        // Count shared tags - use both ID and name (case-insensitive) comparison
+        const sharedTagIds = [];
+        const sharedTagObjects = [];
+        
+        for (const tag of videoTags) {
+          // Check by ID (primary method)
+          if (currentVideoTagIds.includes(tag.id)) {
+            sharedTagIds.push(tag.id);
+            sharedTagObjects.push(tag);
+          }
+          // Fallback: check by name (case-insensitive)
+          else if (currentVideoTagNames.includes(tag.name.toLowerCase())) {
+            sharedTagIds.push(tag.id);
+            sharedTagObjects.push(tag);
+          }
+        }
+        
+        const similarityScore = sharedTagIds.length;
         
         // Only include videos that share at least one tag
         if (similarityScore > 0) {
           videosWithScores.push({
             video: vid,
             score: similarityScore,
-            sharedTags
+            sharedTags: sharedTagObjects
           });
         }
       }
@@ -401,12 +417,10 @@ const VideoPlayer = () => {
       // Sort by similarity score (highest first)
       videosWithScores.sort((a, b) => b.score - a.score);
       
-      // Get the top 6 related videos
+      // Get the top 6 related videos with their shared tags
       const topRelated = videosWithScores.slice(0, 6).map(item => ({
         ...item.video,
-        sharedTags: item.sharedTags ? currentVideo.tags.filter(tag => 
-          item.sharedTags.includes(tag.id)
-        ) : []
+        sharedTags: item.sharedTags
       }));
       
       return topRelated;
