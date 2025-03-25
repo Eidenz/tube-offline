@@ -90,7 +90,6 @@ const Home = () => {
     } 
     // Otherwise, if there are more videos to fetch from the API, fetch them
     else if (pagination.hasMore && !isLoading) {
-      setIsLoading(true);
       try {
         if (selectedCategory === 'all') {
           // For all category, fetch more videos
@@ -115,7 +114,6 @@ const Home = () => {
       } finally {
         // Update display count to show all videos loaded so far
         setDisplayCount(prev => prev + pagination.limit);
-        setIsLoading(false);
       }
     }
   };
