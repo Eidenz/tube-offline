@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { TagIcon, ChevronRightIcon, ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
+import { TagIcon, ChevronRightIcon, ArrowsPointingOutIcon, ArrowDownIcon } from '@heroicons/react/24/outline';
 import { useLibrary } from '../context/LibraryContext';
 import { useNotification } from '../context/NotificationContext';
 
@@ -10,6 +10,8 @@ const Tags = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTag, setSelectedTag] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [displayCount, setDisplayCount] = useState(80); // Display first 80 tags initially
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const navigate = useNavigate();
   
   const { fetchTags } = useLibrary();
@@ -63,6 +65,20 @@ const Tags = () => {
     tag.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
   
+  // Get tags to display based on displayCount
+  const visibleTags = filteredTags.slice(0, displayCount);
+  
+  // Load more tags
+  const handleLoadMore = () => {
+    setIsLoadingMore(true);
+    
+    // Simulate loading with a short delay for better UX
+    setTimeout(() => {
+      setDisplayCount(prevCount => prevCount + 80);
+      setIsLoadingMore(false);
+    }, 300);
+  };
+  
   // Handle tag click
   const handleTagClick = (tag) => {
     setSelectedTag(tag);
@@ -89,6 +105,13 @@ const Tags = () => {
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0 }
+  };
+  
+  // Load more button variants
+  const loadMoreVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0 },
+    hover: { scale: 1.05 }
   };
   
   return (
@@ -129,32 +152,68 @@ const Tags = () => {
           initial="hidden"
           animate="visible"
         >
-          <h2 className="text-xl font-semibold mb-6">All Tags</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-semibold">All Tags</h2>
+            {filteredTags.length > 0 && (
+              <span className="text-sm text-text-secondary">
+                Showing {Math.min(visibleTags.length, filteredTags.length)} of {filteredTags.length} tags
+              </span>
+            )}
+          </div>
           
           {isLoading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
             </div>
           ) : filteredTags.length > 0 ? (
-            <div className="flex flex-wrap gap-3">
-              {filteredTags.map((tag) => {
-                const colorSet = getTagColor(tag.name);
-                return (
+            <div className="space-y-6">
+              <div className="flex flex-wrap gap-3">
+                {visibleTags.map((tag) => {
+                  const colorSet = getTagColor(tag.name);
+                  return (
+                    <motion.button
+                      key={tag.id}
+                      className={`px-4 py-2 rounded-full flex items-center gap-1 transition-colors ${colorSet.bg} ${colorSet.text} ${colorSet.hover} ${selectedTag?.id === tag.id ? 'ring-2 ring-white/30' : ''}`}
+                      onClick={() => handleTagClick(tag)}
+                      variants={itemVariants}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <span>{tag.name}</span>
+                      <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">
+                        {tag.video_count}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+              
+              {/* Load More Button - only show if there are more tags to load */}
+              {filteredTags.length > visibleTags.length && (
+                <div className="flex justify-center pt-4">
                   <motion.button
-                    key={tag.id}
-                    className={`px-4 py-2 rounded-full flex items-center gap-1 transition-colors ${colorSet.bg} ${colorSet.text} ${colorSet.hover} ${selectedTag?.id === tag.id ? 'ring-2 ring-white/30' : ''}`}
-                    onClick={() => handleTagClick(tag)}
-                    variants={itemVariants}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
+                    className="btn btn-outline flex items-center gap-2"
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMore}
+                    variants={loadMoreVariants}
+                    initial="hidden"
+                    animate="visible"
+                    whileHover="hover"
                   >
-                    <span>{tag.name}</span>
-                    <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">
-                      {tag.video_count}
-                    </span>
+                    {isLoadingMore ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-text-primary border-t-transparent rounded-full animate-spin"></div>
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowDownIcon className="w-5 h-5" />
+                        Load {Math.min(80, filteredTags.length - visibleTags.length)} More Tags
+                      </>
+                    )}
                   </motion.button>
-                );
-              })}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-64 text-text-secondary">
