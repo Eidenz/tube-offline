@@ -10,8 +10,32 @@ import {
   downloadPlaylist
 } from '../config/yt-dlp.js';
 import { db } from '../config/database.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
+import os from 'os';
 
 const router = express.Router();
+
+// Set up multer for handling file uploads
+const tmpDir = os.tmpdir();
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, tmpDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = uuidv4();
+    cb(null, `cookies-${uniqueSuffix}${path.extname(file.originalname)}`);
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // Limit to 5MB
+  }
+});
 
 // WebSocket clients for real-time progress updates
 const clients = new Map();
@@ -79,6 +103,21 @@ function broadcastPlaylistProgress(playlistId, videoCount, completed, currentVid
 }
 
 /**
+ * Clean up any temporary cookie files
+ * @param {string} cookieFilePath Path to cookie file to delete
+ */
+function cleanupTempFiles(cookieFilePath) {
+  if (cookieFilePath && fs.existsSync(cookieFilePath)) {
+    try {
+      fs.unlinkSync(cookieFilePath);
+      console.log(`Deleted temporary cookie file: ${cookieFilePath}`);
+    } catch (err) {
+      console.error(`Failed to delete temporary cookie file: ${err.message}`);
+    }
+  }
+}
+
+/**
  * Check if yt-dlp is installed
  * GET /api/download/check
  */
@@ -108,7 +147,18 @@ router.get('/info', async (req, res) => {
     res.json(videoInfo);
   } catch (error) {
     console.error('Error fetching video info:', error);
-    res.status(500).json({ error: 'Failed to fetch video info' });
+    
+    // Check if the error is related to age restriction
+    if (error.message && 
+        (error.message.includes('age') || 
+         error.message.includes('Sign in to confirm your age'))) {
+      res.status(403).json({ 
+        error: 'This video is age-restricted. You need to provide cookies to access it.',
+        isAgeRestricted: true
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to fetch video info' });
+    }
   }
 });
 
@@ -147,7 +197,18 @@ router.get('/playlist-info', async (req, res) => {
     }
   } catch (error) {
     console.error('Error fetching playlist info:', error);
-    res.status(500).json({ error: 'Failed to fetch playlist info' });
+    
+    // Check if error is age-related
+    if (error.message && 
+        (error.message.includes('age') || 
+         error.message.includes('Sign in to confirm your age'))) {
+      res.status(403).json({ 
+        error: 'This playlist contains age-restricted videos. You need to provide cookies to access it.',
+        isAgeRestricted: true
+      });
+    } else {
+      res.status(500).json({ error: 'Failed to fetch playlist information' });
+    }
   }
 });
 
@@ -155,18 +216,26 @@ router.get('/playlist-info', async (req, res) => {
  * Start a new download
  * POST /api/download
  * Body: { url, quality, downloadSubtitles }
+ * File: cookies (optional)
  */
-router.post('/', async (req, res) => {
+router.post('/', upload.single('cookies'), async (req, res) => {
+  let cookieFilePath = null;
+  
   try {
     const { 
       url, 
       quality = '1080', 
       downloadSubtitles = true,
-      addToPlaylistId = null  // New parameter for playlist ID
+      addToPlaylistId = null
     } = req.body;
     
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
+    }
+    
+    // Get cookie file path if provided
+    if (req.file) {
+      cookieFilePath = req.file.path;
     }
     
     // Check if URL is already being downloaded
@@ -178,6 +247,7 @@ router.post('/', async (req, res) => {
     const existingDownload = checkStmt.get(url);
     
     if (existingDownload) {
+      cleanupTempFiles(cookieFilePath);
       return res.status(409).json({ 
         error: 'This URL is already being downloaded',
         download: existingDownload
@@ -199,7 +269,7 @@ router.post('/', async (req, res) => {
       
       try {
         // Get video info to get YouTube ID
-        const videoInfo = await getVideoInfo(url);
+        const videoInfo = await getVideoInfo(url, cookieFilePath);
         if (videoInfo && videoInfo.id) {
           insertStmt.run(
             videoInfo.id,
@@ -221,7 +291,7 @@ router.post('/', async (req, res) => {
     res.status(202).json({ message: 'Download started' });
     
     // Perform the download in the background
-    downloadVideo(url, quality, downloadSubtitles, broadcastProgress)
+    downloadVideo(url, quality, downloadSubtitles, broadcastProgress, cookieFilePath)
       .then(result => {
         console.log('Download completed:', result);
         
@@ -250,10 +320,26 @@ router.post('/', async (req, res) => {
       })
       .catch(error => {
         console.error('Download failed:', error);
+        
+        // Broadcast error to WebSocket clients
+        clients.forEach(client => {
+          if (client.readyState === 1) { // OPEN
+            client.send(JSON.stringify({
+              type: 'error',
+              youtubeId: url.includes('watch?v=') ? url.split('watch?v=')[1].split('&')[0] : 'unknown',
+              error: error.message
+            }));
+          }
+        });
+      })
+      .finally(() => {
+        // Always clean up the cookie file
+        cleanupTempFiles(cookieFilePath);
       });
       
   } catch (error) {
     console.error('Error starting download:', error);
+    cleanupTempFiles(cookieFilePath);
     res.status(500).json({ error: 'Failed to start download' });
   }
 });
@@ -262,18 +348,26 @@ router.post('/', async (req, res) => {
  * Start a new playlist download
  * POST /api/download/playlist
  * Body: { url, quality, downloadSubtitles, playlistId }
+ * File: cookies (optional)
  */
-router.post('/playlist', async (req, res) => {
+router.post('/playlist', upload.single('cookies'), async (req, res) => {
+  let cookieFilePath = null;
+  
   try {
     const { 
       url, 
       quality = '720', 
       downloadSubtitles = true,
-      playlistId = null  // Local playlist ID to add videos to
+      playlistId = null
     } = req.body;
     
     if (!url) {
       return res.status(400).json({ error: 'Playlist URL is required' });
+    }
+    
+    // Get cookie file path if provided
+    if (req.file) {
+      cookieFilePath = req.file.path;
     }
     
     // Check if URL is already being downloaded
@@ -285,6 +379,7 @@ router.post('/playlist', async (req, res) => {
     const existingDownload = checkStmt.get(url);
     
     if (existingDownload) {
+      cleanupTempFiles(cookieFilePath);
       return res.status(409).json({ 
         error: 'This playlist is already being downloaded',
         download: existingDownload
@@ -293,9 +388,10 @@ router.post('/playlist', async (req, res) => {
     
     // First get basic info about the playlist
     try {
-      const playlistInfo = await getPlaylistInfo(url);
+      const playlistInfo = await getPlaylistInfo(url, cookieFilePath);
       
       if (!playlistInfo || !playlistInfo.id) {
+        cleanupTempFiles(cookieFilePath);
         return res.status(400).json({ 
           error: 'Invalid playlist URL or could not fetch playlist information'
         });
@@ -351,16 +447,22 @@ router.post('/playlist', async (req, res) => {
         playlistId, 
         (plId, count, completed, current) => {
           broadcastPlaylistProgress(plId, count, completed, current);
-        }
+        },
+        cookieFilePath
       )
         .then(result => {
           console.log('Playlist download completed:', result);
         })
         .catch(error => {
           console.error('Playlist download failed:', error);
+        })
+        .finally(() => {
+          // Always clean up the cookie file
+          cleanupTempFiles(cookieFilePath);
         });
     } catch (error) {
       console.error('Error fetching playlist info:', error);
+      cleanupTempFiles(cookieFilePath);
       return res.status(500).json({ 
         error: 'Failed to fetch playlist information',
         details: error.message
@@ -368,6 +470,7 @@ router.post('/playlist', async (req, res) => {
     }
   } catch (error) {
     console.error('Error starting playlist download:', error);
+    cleanupTempFiles(cookieFilePath);
     res.status(500).json({ error: 'Failed to start playlist download' });
   }
 });

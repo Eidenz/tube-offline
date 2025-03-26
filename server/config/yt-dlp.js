@@ -286,15 +286,25 @@ async function ensureYtDlpReady() {
 /**
  * Get video information using yt-dlp
  * @param {string} url YouTube URL
+ * @param {string|null} cookiesFile Path to cookies file for age-restricted videos
  * @returns {Promise<Object>} Video information
  */
-function getVideoInfo(url) {
+function getVideoInfo(url, cookiesFile = null) {
   return new Promise((resolve, reject) => {
     const args = [
       '--dump-json',
-      '--no-playlist',
-      url
+      '--no-playlist'
     ];
+    
+    // Add cookies file if provided
+    if (cookiesFile && fs.existsSync(cookiesFile)) {
+      args.push('--cookies', cookiesFile);
+    }
+    
+    // Add the URL as the last argument
+    args.push(url);
+    
+    console.log(`Running yt-dlp with args: ${args.join(' ')}`);
     
     const ytDlp = spawn('yt-dlp', args);
     let stdout = '';
@@ -308,16 +318,25 @@ function getVideoInfo(url) {
       stderr += data.toString();
     });
     
-    ytDlp.on('close', (code) => {
+    ytDlp.on('close', async (code) => {
       if (code !== 0) {
+        // Check if this is an age restriction error
+        if (stderr.includes('Sign in to confirm your age') || 
+          stderr.includes('age-restricted')) {
+          return reject(new Error(`Age-restricted video requires authentication: ${stderr}`));
+        }
+        
+        // Check if this is a format availability error
+        if (stderr.includes('Requested format is not available') || 
+            stderr.includes('Only images are available for download')) {
+          
+          // Create a user-friendly error message
+          const errorMessage = 'This video cannot be downloaded in the requested format. It may only contain images or no downloadable video content.';
+          
+          return reject(new Error(errorMessage));
+        }
+        
         return reject(new Error(`yt-dlp process failed with code ${code}: ${stderr}`));
-      }
-      
-      try {
-        const videoInfo = JSON.parse(stdout);
-        resolve(videoInfo);
-      } catch (error) {
-        reject(new Error(`Failed to parse yt-dlp output: ${error.message}`));
       }
     });
   });
@@ -329,13 +348,14 @@ function getVideoInfo(url) {
  * @param {string} quality Video quality (e.g. '1080', '720', '480', '360', 'audio')
  * @param {boolean} downloadSubtitles Whether to download subtitles
  * @param {Function} progressCallback Callback for download progress updates
+ * @param {string|null} cookiesFile Path to cookies file for age-restricted videos
  * @returns {Promise<Object>} Download result with file paths
  */
-function downloadVideo(url, quality, downloadSubtitles = true, progressCallback = () => {}) {
+function downloadVideo(url, quality, downloadSubtitles = true, progressCallback = () => {}, cookiesFile = null) {
   return new Promise(async (resolve, reject) => {
     try {
       // First get video info to extract ID and other metadata
-      const videoInfo = await getVideoInfo(url);
+      const videoInfo = await getVideoInfo(url, cookiesFile);
       const youtubeId = videoInfo.id;
       
       // Get any playlist target from the downloads table
@@ -388,8 +408,15 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
         ];
       }
       
+      // Add cookies file if provided
+      if (cookiesFile && fs.existsSync(cookiesFile)) {
+        args.push('--cookies', cookiesFile);
+      }
+      
       // Add the URL as the last argument
       args.push(url);
+      
+      console.log(`Running yt-dlp download with args: ${args.join(' ')}`);
       
       const ytDlp = spawn('yt-dlp', args);
       let stderr = '';
@@ -419,6 +446,23 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
       
       ytDlp.on('close', async (code) => {
         if (code !== 0) {
+          // Check if this is an age restriction error
+          if (stderr.includes('Sign in to confirm your age') || 
+              stderr.includes('age-restricted')) {
+            
+            // Update database with error
+            const updateErrorStmt = db.prepare(`
+              UPDATE downloads SET 
+              status = 'failed', 
+              error_message = ?, 
+              date_completed = CURRENT_TIMESTAMP
+              WHERE youtube_id = ?
+            `);
+            updateErrorStmt.run('Age-restricted video requires authentication. Please provide cookies.', youtubeId);
+            
+            return reject(new Error(`Age-restricted video requires authentication: ${stderr}`));
+          }
+          
           // Update database with error
           const updateErrorStmt = db.prepare(`
             UPDATE downloads SET 
@@ -759,17 +803,25 @@ function checkYtDlpInstalled() {
 /**
  * Get playlist information using yt-dlp
  * @param {string} url YouTube playlist URL
+ * @param {string|null} cookiesFile Path to cookies file for age-restricted videos
  * @returns {Promise<Object>} Playlist information
  */
-function getPlaylistInfo(url) {
+function getPlaylistInfo(url, cookiesFile = null) {
   return new Promise((resolve, reject) => {
     // Use --dump-single-json to get all information in a single JSON output
     // Avoid --flat-playlist which would limit the video details
     const args = [
       '--dump-single-json',
-      '--no-flat-playlist',
-      url
+      '--no-flat-playlist'
     ];
+    
+    // Add cookies file if provided
+    if (cookiesFile && fs.existsSync(cookiesFile)) {
+      args.push('--cookies', cookiesFile);
+    }
+    
+    // Add the URL as the last argument
+    args.push(url);
     
     console.log('Getting playlist info with command:', 'yt-dlp', args.join(' '));
     
@@ -789,15 +841,28 @@ function getPlaylistInfo(url) {
       if (code !== 0) {
         console.error(`yt-dlp failed with code ${code}: ${stderr}`);
         
+        // Check if the error is related to age restriction
+        if (stderr.includes('Sign in to confirm your age') || 
+            stderr.includes('age-restricted')) {
+          return reject(new Error(`Age-restricted playlist requires authentication: ${stderr}`));
+        }
+        
         // Try a fallback approach with simpler options
         console.log('Trying fallback approach to get playlist info...');
         
         const fallbackArgs = [
           '--get-id',
           '--get-title',
-          '--get-thumbnail',
-          url
+          '--get-thumbnail'
         ];
+        
+        // Add cookies file if provided
+        if (cookiesFile && fs.existsSync(cookiesFile)) {
+          fallbackArgs.push('--cookies', cookiesFile);
+        }
+        
+        // Add URL
+        fallbackArgs.push(url);
         
         const fallbackYtDlp = spawn('yt-dlp', fallbackArgs);
         let fallbackStdout = '';
@@ -813,6 +878,12 @@ function getPlaylistInfo(url) {
         
         fallbackYtDlp.on('close', (fallbackCode) => {
           if (fallbackCode !== 0) {
+            // Check if the fallback error is also age-related
+            if (fallbackStderr.includes('Sign in to confirm your age') || 
+                fallbackStderr.includes('age-restricted')) {
+              return reject(new Error(`Age-restricted playlist requires authentication: ${fallbackStderr}`));
+            }
+            
             return reject(new Error(`Both yt-dlp approaches failed: ${stderr}\n${fallbackStderr}`));
           }
           
@@ -905,13 +976,14 @@ function getPlaylistInfo(url) {
  * @param {boolean} downloadSubtitles Whether to download subtitles
  * @param {string|null} localPlaylistId Local playlist ID to add videos to
  * @param {Function} progressCallback Callback for playlist download progress updates
+ * @param {string|null} cookiesFile Path to cookies file for age-restricted videos
  * @returns {Promise<Object>} Download result
  */
-async function downloadPlaylist(url, quality, downloadSubtitles = true, localPlaylistId = null, progressCallback = () => {}) {
+async function downloadPlaylist(url, quality, downloadSubtitles = true, localPlaylistId = null, progressCallback = () => {}, cookiesFile = null) {
   // First get playlist info
   let playlistInfo;
   try {
-    playlistInfo = await getPlaylistInfo(url);
+    playlistInfo = await getPlaylistInfo(url, cookiesFile);
     
     if (!playlistInfo || !playlistInfo.id) {
       throw new Error('Failed to get playlist information');
@@ -922,8 +994,18 @@ async function downloadPlaylist(url, quality, downloadSubtitles = true, localPla
       console.warn('No video entries found in playlist, trying direct approach...');
       
       // Try executing yt-dlp directly to list video IDs
+      const videoIdsArgs = ['--get-id'];
+      
+      // Add cookies if needed
+      if (cookiesFile && fs.existsSync(cookiesFile)) {
+        videoIdsArgs.push('--cookies', cookiesFile);
+      }
+      
+      // Add URL
+      videoIdsArgs.push(url);
+      
       const videoIds = await new Promise((resolve, reject) => {
-        const ytDlp = spawn('yt-dlp', ['--get-id', url]);
+        const ytDlp = spawn('yt-dlp', videoIdsArgs);
         let stdout = '';
         let stderr = '';
         
@@ -1066,7 +1148,8 @@ async function downloadPlaylist(url, quality, downloadSubtitles = true, localPla
             if (progress % 25 === 0) {
               console.log(`Video ${i+1}/${totalVideos} progress: ${progress}%`);
             }
-          }
+          },
+          cookiesFile
         );
         
         // Add to our results array

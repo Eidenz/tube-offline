@@ -153,13 +153,17 @@ export const DownloadProvider = ({ children }) => {
     }
   }, [error]);
   
-  const startDownload = useCallback(async (url, quality = 'best', downloadSubtitles = true, playlistId = null) => {
+  /**
+   * Start a video download
+   * @param {FormData} formData FormData containing URL, quality, subtitles choice, and optional cookies file
+   * @returns {Promise<boolean>} Success state
+   */
+  const startDownload = useCallback(async (formData) => {
     try {
-      await axios.post(DOWNLOAD_API, {
-        url,
-        quality,
-        downloadSubtitles,
-        addToPlaylistId: playlistId
+      await axios.post(DOWNLOAD_API, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
       });
       
       success('Download started!');
@@ -167,7 +171,15 @@ export const DownloadProvider = ({ children }) => {
       return true;
     } catch (err) {
       console.error('Failed to start download:', err);
-      if (err.response?.status === 409) {
+      
+      // Check if the error is related to age restriction
+      if (err.response?.data?.error && 
+          (err.response.data.error.includes('age') || 
+          err.response.data.error.includes('Sign in to confirm your age'))) {
+        error('This video is age-restricted. Please provide YouTube cookies to download.');
+        // The component will handle showing the cookie upload
+        return false;
+      } else if (err.response?.status === 409) {
         error('This video is already being downloaded');
       } else {
         error('Failed to start download');
@@ -202,7 +214,17 @@ export const DownloadProvider = ({ children }) => {
       return response.data;
     } catch (err) {
       console.error('Failed to get video info:', err);
-      error('Failed to fetch video information');
+      
+      // Check if the error is related to age restriction
+      if (err.response?.data?.error && 
+          (err.response.data.error.includes('age') || 
+           err.response.data.error.includes('Sign in to confirm your age'))) {
+        error('This video is age-restricted. Please provide YouTube cookies to download.');
+        // Return an object that indicates age restriction
+        return { isAgeRestricted: true };
+      } else {
+        error('Failed to fetch video information');
+      }
       return null;
     }
   }, [error]);
@@ -274,20 +296,32 @@ export const DownloadProvider = ({ children }) => {
     error(`Download failed: ${errorMessage}`);
   }, [error]);
 
-  const downloadPlaylist = useCallback(async (url, quality = '720', downloadSubtitles = true, localPlaylistId = null) => {
+  /**
+   * Download a YouTube playlist
+   * @param {FormData} formData FormData containing URL, quality, subtitles choice, playlist ID, and optional cookies file
+   * @returns {Promise<Object|boolean>} Download result or false on error
+   */
+  const downloadPlaylist = useCallback(async (formData) => {
     try {
-      const response = await axios.post(`${DOWNLOAD_API}/playlist`, {
-        url,
-        quality,
-        downloadSubtitles,
-        playlistId: localPlaylistId
+      const response = await axios.post(`${DOWNLOAD_API}/playlist`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
       });
       
+      success(`Playlist download started: ${response.data.title || 'YouTube Playlist'}`);
       fetchActiveDownloads();
       return response.data;
     } catch (err) {
       console.error('Failed to start playlist download:', err);
-      if (err.response?.status === 409) {
+      
+      // Check if the error is related to age restriction
+      if (err.response?.data?.error && 
+          (err.response.data.error.includes('age') || 
+           err.response.data.error.includes('Sign in to confirm your age'))) {
+        error('This playlist contains age-restricted videos. Please provide YouTube cookies to download.');
+        return false;
+      } else if (err.response?.status === 409) {
         error('This playlist is already being downloaded');
       } else {
         error('Failed to start playlist download');
@@ -304,7 +338,27 @@ export const DownloadProvider = ({ children }) => {
       return response.data;
     } catch (err) {
       console.error('Failed to get playlist info:', err);
-      error('Failed to fetch playlist information');
+      
+      // Check if the error is related to age restriction
+      if (err.response?.data?.error && 
+          (err.response.data.error.includes('age') || 
+          err.response.data.error.includes('Sign in to confirm your age'))) {
+        error('This video is age-restricted. Please provide YouTube cookies to download.');
+        // The component will handle showing the cookie upload
+        return false;
+      } else if (err.response?.data?.error && 
+                err.response.data.error.includes('Only images are available')) {
+        error('This video cannot be downloaded. It may only contain images or no downloadable content.');
+        return false;
+      } else if (err.response?.data?.error && 
+                err.response.data.error.includes('Requested format is not available')) {
+        error('This video format is not available. Try a different quality setting.');
+        return false;
+      } else if (err.response?.status === 409) {
+        error('This video is already being downloaded');
+      } else {
+        error('Failed to start download');
+      }
       return null;
     }
   }, [error]);

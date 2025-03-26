@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   XMarkIcon, 
@@ -12,6 +12,7 @@ import {
 import { useDownload } from '../../context/DownloadContext';
 import { useNotification } from '../../context/NotificationContext';
 import { useLibrary } from '../../context/LibraryContext';
+import CookieUpload from '../ui/CookieUpload';
 
 const DownloadModal = ({ isOpen, onClose }) => {
   const [url, setUrl] = useState('');
@@ -26,6 +27,11 @@ const DownloadModal = ({ isOpen, onClose }) => {
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(null);
   const [showPlaylistDropdown, setShowPlaylistDropdown] = useState(false);
   const [availablePlaylists, setAvailablePlaylists] = useState([]);
+  
+  // New states for cookies handling
+  const [isAgeRestricted, setIsAgeRestricted] = useState(false);
+  const [cookiesFile, setCookiesFile] = useState(null);
+  const fileInputRef = useRef(null);
   
   const { startDownload, getVideoInfo, isYtDlpInstalled, downloadPlaylist, getPlaylistInfo } = useDownload();
   const { createPlaylist, playlists, fetchPlaylists } = useLibrary();
@@ -44,6 +50,8 @@ const DownloadModal = ({ isOpen, onClose }) => {
       setSelectedPlaylistId(null);
       setIsSubmitting(false);
       setShowPlaylistDropdown(false);
+      setIsAgeRestricted(false);
+      setCookiesFile(null);
       
       // Fetch available playlists
       fetchPlaylists()
@@ -79,6 +87,7 @@ const DownloadModal = ({ isOpen, onClose }) => {
     setUrl(newUrl);
     setVideoInfo(null);
     setPlaylistInfo(null);
+    setIsAgeRestricted(false);
     
     if (!newUrl.trim() || !isYtDlpInstalled) return;
     
@@ -110,13 +119,27 @@ const DownloadModal = ({ isOpen, onClose }) => {
           // Get single video info
           const info = await getVideoInfo(newUrl);
           if (info) {
-            setVideoInfo(info);
+            // Check for isAgeRestricted flag
+            if (info.isAgeRestricted) {
+              setIsAgeRestricted(true);
+              setVideoInfo(null); // Clear video info as we don't have complete info
+            } else {
+              setVideoInfo(info);
+            }
           } else {
             setIsUrlValid(false);
           }
         }
       } catch (err) {
         console.error('Error fetching video/playlist info:', err);
+        
+        // Check if the error is related to age restriction
+        if (err.response?.data?.error && 
+            (err.response.data.error.includes('age') || 
+             err.response.data.error.includes('Sign in to confirm your age'))) {
+          setIsAgeRestricted(true);
+        }
+        
         setIsUrlValid(false);
       } finally {
         setIsLoading(false);
@@ -169,6 +192,12 @@ const DownloadModal = ({ isOpen, onClose }) => {
       return;
     }
     
+    // Check if cookies are needed but not provided
+    if (isAgeRestricted && !cookiesFile) {
+      error('This video is age-restricted. Please provide YouTube cookies to download.');
+      return;
+    }
+    
     // Set submitting state to prevent multiple clicks
     setIsSubmitting(true);
     
@@ -205,12 +234,23 @@ const DownloadModal = ({ isOpen, onClose }) => {
           }
         }
         
-        // Start the playlist download
+        // Prepare form data for file upload
+        const formData = new FormData();
+        formData.append('url', url);
+        formData.append('quality', '1080');
+        formData.append('downloadSubtitles', downloadSubtitles.toString());
+        
+        if (localPlaylistId) {
+          formData.append('playlistId', localPlaylistId);
+        }
+        
+        if (cookiesFile) {
+          formData.append('cookies', cookiesFile);
+        }
+        
+        // Start the playlist download with cookies if needed
         const downloadSuccess = await downloadPlaylist(
-          url, 
-          '1080', 
-          downloadSubtitles, 
-          localPlaylistId
+          formData
         );
         
         if (downloadSuccess) {
@@ -221,19 +261,28 @@ const DownloadModal = ({ isOpen, onClose }) => {
         }
       } else {
         // Handle single video download
-        if (!videoInfo) {
+        if (!videoInfo && !isAgeRestricted) {
           error('Please wait for video information to be fetched');
           setIsSubmitting(false);
           return;
         }
         
-        // Start download with highest quality using startDownload from context
-        const downloadSuccess = await startDownload(
-          url,
-          'best',
-          downloadSubtitles,
-          playlistToAddTo
-        );
+        // Prepare form data for file upload
+        const formData = new FormData();
+        formData.append('url', url);
+        formData.append('quality', 'best');
+        formData.append('downloadSubtitles', downloadSubtitles.toString());
+        
+        if (playlistToAddTo) {
+          formData.append('addToPlaylistId', playlistToAddTo);
+        }
+        
+        if (cookiesFile) {
+          formData.append('cookies', cookiesFile);
+        }
+        
+        // Start download with file upload
+        const downloadSuccess = await startDownload(formData);
         
         if (downloadSuccess) {
           onClose();
@@ -244,7 +293,13 @@ const DownloadModal = ({ isOpen, onClose }) => {
     } catch (err) {
       console.error('Failed to start download:', err);
       
-      if (err.response?.status === 409) {
+      // Check if the error is related to age restriction
+      if (err.response?.data?.error && 
+          (err.response.data.error.includes('age') || 
+           err.response.data.error.includes('Sign in to confirm your age'))) {
+        setIsAgeRestricted(true);
+        error('This video is age-restricted. Please provide YouTube cookies to download.');
+      } else if (err.response?.status === 409) {
         error('This video is already being downloaded');
       } else {
         error('Failed to start download');
@@ -259,7 +314,8 @@ const DownloadModal = ({ isOpen, onClose }) => {
     !url.trim() || 
     isLoading || 
     !isYtDlpInstalled || 
-    (!videoInfo && !playlistInfo) ||
+    ((!videoInfo && !isAgeRestricted) && (!playlistInfo && !isAgeRestricted)) ||
+    (isAgeRestricted && !cookiesFile) ||
     isSubmitting;
   
   if (!isOpen) return null;
@@ -316,6 +372,17 @@ const DownloadModal = ({ isOpen, onClose }) => {
                   disabled={isSubmitting}
                 />
               </div>
+
+              {/* Cookie Upload Component */}
+              <AnimatePresence>
+                {isAgeRestricted && (
+                  <CookieUpload 
+                    cookiesFile={cookiesFile}
+                    onCookiesChange={setCookiesFile}
+                    isAgeRestricted={isAgeRestricted}
+                  />
+                )}
+              </AnimatePresence>
               
               {/* Video/Playlist Info Preview */}
               {isLoading && (
@@ -324,7 +391,7 @@ const DownloadModal = ({ isOpen, onClose }) => {
                 </div>
               )}
               
-              {isUrlValid && !videoInfo && !playlistInfo && !isLoading && (
+              {isUrlValid && !videoInfo && !playlistInfo && !isLoading && !isAgeRestricted && (
                 <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3">
                   <div className="flex items-start gap-2">
                     <InformationCircleIcon className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
@@ -403,7 +470,7 @@ const DownloadModal = ({ isOpen, onClose }) => {
               )}
               
               {/* Playlist Selection */}
-              {(videoInfo || playlistInfo) && (
+              {(videoInfo || playlistInfo || isAgeRestricted) && (
                 <div className="space-y-2">
                   <label className="block text-sm text-text-secondary">
                     Add to playlist
