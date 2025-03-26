@@ -692,7 +692,7 @@ async function cancelDownload(youtubeId) {
     try {
       // Find the download in the database
       const downloadStmt = db.prepare(`
-        SELECT * FROM downloads WHERE youtube_id = ? AND status = 'downloading'
+        SELECT * FROM downloads WHERE youtube_id = ? AND (status = 'downloading' OR status = 'failed' OR status = 'pending')
       `);
       const download = downloadStmt.get(youtubeId);
       
