@@ -338,6 +338,13 @@ function getVideoInfo(url, cookiesFile = null) {
         
         return reject(new Error(`yt-dlp process failed with code ${code}: ${stderr}`));
       }
+
+      try {
+        const videoInfo = JSON.parse(stdout);
+        resolve(videoInfo);
+      } catch (error) {
+        reject(new Error(`Failed to parse yt-dlp output: ${error.message}`));
+      }
     });
   });
 }

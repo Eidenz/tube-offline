@@ -99,10 +99,6 @@ function broadcastDownloadComplete(youtubeId, videoData) {
           console.error(`Error adding downloaded video to playlist: ${err.message}`);
         }
       });
-      
-      // Remove the processed entries
-      const remainingAdditions = pendingAdditions.filter(entry => entry.youtubeId !== youtubeId);
-      localStorage.setItem('pendingPlaylistAdditions', JSON.stringify(remainingAdditions));
     }
   } catch (err) {
     console.error('Error processing pending playlist additions:', err);
