@@ -93,10 +93,12 @@ const Playlists = () => {
     }
     
     try {
+      // For new playlists, we don't have a thumbnail yet
+      // It will be added when videos are added to the playlist
       const newPlaylist = await createPlaylist(
         newPlaylistName, 
         newPlaylistDescription,
-        selectedThumbnailUrl
+        null // No thumbnail for new playlists
       );
       
       if (newPlaylist) {
@@ -108,6 +110,7 @@ const Playlists = () => {
       }
     } catch (err) {
       console.error('Failed to create playlist:', err);
+      error('Failed to create playlist');
     }
   };
   
@@ -121,21 +124,41 @@ const Playlists = () => {
     }
     
     try {
+      // Find the selected video from thumbnails selection to get its ID
+      let thumbnailVideoId = null;
+      
+      if (selectedThumbnailUrl) {
+        // Find the video with this thumbnail URL
+        const matchingVideo = selectedPlaylistVideos.find(
+          video => video.thumbnail_url === selectedThumbnailUrl
+        );
+        
+        if (matchingVideo) {
+          thumbnailVideoId = matchingVideo.id;
+        }
+      }
+      
       const updatedPlaylist = await updatePlaylist(
-        selectedPlaylist.id, 
+        selectedPlaylist.id,
         {
           name: newPlaylistName,
           description: newPlaylistDescription
         },
-        selectedThumbnailUrl || undefined
+        thumbnailVideoId
       );
       
       if (updatedPlaylist) {
-        setPlaylists(playlists.map(p => p.id === selectedPlaylist.id ? updatedPlaylist : p));
+        // Update the local playlists state with the complete data
+        setPlaylists(prevPlaylists => 
+          prevPlaylists.map(p => p.id === selectedPlaylist.id ? updatedPlaylist : p)
+        );
+        
+        // Close the modal
         setIsEditModalOpen(false);
       }
     } catch (err) {
       console.error('Failed to update playlist:', err);
+      error('Failed to update playlist');
     }
   };
   
@@ -158,7 +181,7 @@ const Playlists = () => {
     setSelectedPlaylist(playlist);
     setNewPlaylistName(playlist.name);
     setNewPlaylistDescription(playlist.description || '');
-    setSelectedThumbnailUrl(getPlaylistThumbnail(playlist.id) || '');
+    setSelectedThumbnailUrl(playlist.thumbnail_url || '');
     setIsEditModalOpen(true);
   };
   
@@ -185,8 +208,10 @@ const Playlists = () => {
   
   // Get playlist thumbnail URL
   const getPlaylistThumbnailUrl = (playlist) => {
-    const thumbnailUrl = getPlaylistThumbnail(playlist.id);
-    if (thumbnailUrl) return thumbnailUrl;
+    // Use the thumbnail_url from the API response if available
+    if (playlist.thumbnail_url) {
+      return playlist.thumbnail_url;
+    }
     
     // Default image if no thumbnail
     return '/placeholder-thumbnail.jpg';
@@ -276,7 +301,7 @@ const Playlists = () => {
                   <h3 className="font-medium text-lg mb-1 line-clamp-1">{playlist.name}</h3>
                   
                   {playlist.description && (
-                    <p className="text-sm text-text-secondary mb-3 line-clamp-2">
+                    <p className="text-sm text-text-secondary mb-3 line-clamp-2" style={{height: '40px'}}>
                       {playlist.description}
                     </p>
                   )}

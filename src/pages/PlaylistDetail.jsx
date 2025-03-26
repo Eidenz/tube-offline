@@ -172,8 +172,17 @@ const PlaylistDetail = () => {
         </button>
         
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <QueueListIcon className="w-8 h-8 text-accent" />
+          <div className="flex items-start gap-3">
+            {/* Show thumbnail if available */}
+            {playlist.thumbnail_url ? (
+              <img 
+                src={playlist.thumbnail_url} 
+                alt={playlist.name}
+                className="w-12 h-12 object-cover rounded-lg"
+              />
+            ) : (
+              <QueueListIcon className="w-12 h-12 text-accent" />
+            )}
             <div>
               <h1 className="text-2xl font-bold">{playlist.name}</h1>
               <p className="text-text-secondary text-sm">

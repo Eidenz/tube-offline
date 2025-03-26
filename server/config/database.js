@@ -168,6 +168,16 @@ function initializeDatabase() {
           console.log('Adding playlist_target_id column to downloads table');
           db.exec(`ALTER TABLE downloads ADD COLUMN playlist_target_id INTEGER DEFAULT NULL`);
         }
+
+        // Check if the thumbnail_id column exists in the playlists table
+        const checkPlaylistColumns = db.prepare(`PRAGMA table_info(playlists)`).all();
+        const hasThumbColumn = checkPlaylistColumns.some(col => col.name === 'thumbnail_id');
+
+        // Add thumbnail_id column if it doesn't exist
+        if (!hasThumbColumn) {
+          console.log('Adding thumbnail_id column to playlists table');
+          db.exec(`ALTER TABLE playlists ADD COLUMN thumbnail_id INTEGER DEFAULT NULL`);
+        }
       } catch (error) {
         console.error('Error updating downloads table schema:', error);
         // Continue initialization even if this fails

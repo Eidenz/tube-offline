@@ -5,7 +5,7 @@ import path from 'path';
 const router = express.Router();
 
 /**
- * Get all playlists
+ * Get all playlists with thumbnails
  * GET /api/playlists
  */
 router.get('/', (req, res) => {
@@ -21,7 +21,18 @@ router.get('/', (req, res) => {
     `);
     
     const playlists = stmt.all();
-    res.json(playlists);
+    
+    // Add thumbnail URLs
+    const playlistsWithThumbnails = playlists.map(playlist => {
+      const thumbnailUrl = getPlaylistThumbnailUrl(playlist.id, playlist.thumbnail_id);
+      
+      return {
+        ...playlist,
+        thumbnail_url: thumbnailUrl
+      };
+    });
+    
+    res.json(playlistsWithThumbnails);
   } catch (error) {
     console.error('Failed to fetch playlists:', error);
     res.status(500).json({ error: 'Failed to fetch playlists' });
@@ -31,27 +42,28 @@ router.get('/', (req, res) => {
 /**
  * Create a new playlist
  * POST /api/playlists
- * Body: { name, description }
+ * Body: { name, description, thumbnail_id }
  */
 router.post('/', (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, thumbnail_id } = req.body;
     
     if (!name) {
       return res.status(400).json({ error: 'Playlist name is required' });
     }
     
     const stmt = db.prepare(`
-      INSERT INTO playlists (name, description)
-      VALUES (?, ?)
+      INSERT INTO playlists (name, description, thumbnail_id)
+      VALUES (?, ?, ?)
     `);
     
-    const result = stmt.run(name, description || '');
+    const result = stmt.run(name, description || '', thumbnail_id || null);
     
     const newPlaylist = {
       id: result.lastInsertRowid,
       name,
       description: description || '',
+      thumbnail_id: thumbnail_id || null,
       date_created: new Date().toISOString(),
       last_updated: new Date().toISOString(),
       video_count: 0
@@ -65,7 +77,7 @@ router.post('/', (req, res) => {
 });
 
 /**
- * Get a single playlist with its videos
+ * Get a single playlist with its videos and thumbnail
  * GET /api/playlists/:id
  */
 router.get('/:id', (req, res) => {
@@ -103,6 +115,9 @@ router.get('/:id', (req, res) => {
     
     const videos = videosStmt.all(playlistId);
     
+    // Get thumbnail URL
+    const thumbnailUrl = getPlaylistThumbnailUrl(playlistId, playlist.thumbnail_id);
+    
     // Format response
     const formattedVideos = videos.map(video => ({
       ...video,
@@ -112,6 +127,7 @@ router.get('/:id', (req, res) => {
     
     res.json({
       ...playlist,
+      thumbnail_url: thumbnailUrl,
       videos: formattedVideos
     });
   } catch (error) {
@@ -123,12 +139,12 @@ router.get('/:id', (req, res) => {
 /**
  * Update a playlist
  * PUT /api/playlists/:id
- * Body: { name, description }
+ * Body: { name, description, thumbnail_id }
  */
 router.put('/:id', (req, res) => {
   try {
     const playlistId = req.params.id;
-    const { name, description } = req.body;
+    const { name, description, thumbnail_id } = req.body;
     
     if (!name) {
       return res.status(400).json({ error: 'Playlist name is required' });
@@ -145,11 +161,11 @@ router.put('/:id', (req, res) => {
     // Update playlist
     const updateStmt = db.prepare(`
       UPDATE playlists 
-      SET name = ?, description = ?, last_updated = CURRENT_TIMESTAMP
+      SET name = ?, description = ?, thumbnail_id = ?, last_updated = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
     
-    updateStmt.run(name, description || '', playlistId);
+    updateStmt.run(name, description || '', thumbnail_id, playlistId);
     
     // Get updated playlist
     const getStmt = db.prepare(`
@@ -356,6 +372,37 @@ router.put('/:id/reorder', (req, res) => {
     res.status(500).json({ error: 'Failed to reorder playlist' });
   }
 });
+
+/**
+ * Helper function to get playlist thumbnail URL
+ * @param {number} playlistId - Playlist ID
+ * @param {string} thumbnailId - Video ID used for thumbnail
+ * @returns {string|null} Thumbnail URL or null
+ */
+function getPlaylistThumbnailUrl(playlistId, thumbnailId) {
+  if (!thumbnailId) {
+    return null;
+  }
+  
+  try {
+    // Look up the video to get its thumbnail path
+    const stmt = db.prepare(`
+      SELECT thumbnail_path FROM videos WHERE id = ? OR youtube_id = ?
+    `);
+    
+    const video = stmt.get(thumbnailId, thumbnailId);
+    
+    if (video && video.thumbnail_path) {
+      // Convert to relative URL
+      return `/thumbnails/${path.basename(video.thumbnail_path)}`;
+    }
+    
+    return null;
+  } catch (err) {
+    console.error(`Error getting thumbnail for playlist ${playlistId}:`, err);
+    return null;
+  }
+}
 
 /**
  * Helper function to format duration in seconds to HH:MM:SS

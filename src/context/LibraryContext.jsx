@@ -253,25 +253,20 @@ export const LibraryProvider = ({ children }) => {
   }, [error]);
   
   // Create a new playlist
-  const createPlaylist = useCallback(async (name, description = '', thumbnailUrl = null) => {
+  const createPlaylist = useCallback(async (name, description = '', thumbnailId = null) => {
     try {
       const response = await axios.post(`${API_URL}/playlists`, {
         name,
-        description
+        description,
+        thumbnail_id: thumbnailId // Send thumbnail_id to server
       });
       
       const newPlaylist = response.data;
       
-      // Store the thumbnail URL in localStorage if provided
-      if (thumbnailUrl) {
-        const playlistThumbnails = JSON.parse(localStorage.getItem('playlistThumbnails') || '{}');
-        playlistThumbnails[newPlaylist.id] = thumbnailUrl;
-        localStorage.setItem('playlistThumbnails', JSON.stringify(playlistThumbnails));
-      }
-      
       // Update the local state
       setPlaylists(prevPlaylists => [...prevPlaylists, newPlaylist]);
       
+      success('Playlist created successfully');
       return newPlaylist;
     } catch (err) {
       console.error('Failed to create playlist:', err);
@@ -281,29 +276,28 @@ export const LibraryProvider = ({ children }) => {
   }, [success, error]);
   
   // Update a playlist
-  const updatePlaylist = useCallback(async (id, updates, thumbnailUrl = null) => {
+  const updatePlaylist = useCallback(async (id, updates, thumbnailId = null) => {
     try {
       const response = await axios.put(`${API_URL}/playlists/${id}`, {
         name: updates.name,
-        description: updates.description
+        description: updates.description,
+        thumbnail_id: thumbnailId // Send thumbnail_id to server
       });
       
-      // Update thumbnail in localStorage if provided
-      if (thumbnailUrl) {
-        const playlistThumbnails = JSON.parse(localStorage.getItem('playlistThumbnails') || '{}');
-        playlistThumbnails[id] = thumbnailUrl;
-        localStorage.setItem('playlistThumbnails', JSON.stringify(playlistThumbnails));
-      }
+      // After update, fetch the complete playlist with thumbnail_url
+      // This ensures we have the latest data including the thumbnail URL
+      const updatedPlaylistResponse = await axios.get(`${API_URL}/playlists/${id}`);
+      const completePlaylist = updatedPlaylistResponse.data;
       
-      // Update the local state
+      // Update the local state with complete data including thumbnail
       setPlaylists(prevPlaylists => 
         prevPlaylists.map(playlist => 
-          playlist.id === id ? response.data : playlist
+          playlist.id === id ? completePlaylist : playlist
         )
       );
       
       success('Playlist updated successfully');
-      return response.data;
+      return completePlaylist;
     } catch (err) {
       console.error('Failed to update playlist:', err);
       error('Failed to update playlist');
@@ -313,14 +307,16 @@ export const LibraryProvider = ({ children }) => {
   
   // Get playlist thumbnail
   const getPlaylistThumbnail = useCallback((playlistId) => {
-    try {
-      const playlistThumbnails = JSON.parse(localStorage.getItem('playlistThumbnails') || '{}');
-      return playlistThumbnails[playlistId] || null;
-    } catch (err) {
-      console.error('Failed to get playlist thumbnail:', err);
-      return null;
+    // Find the playlist in our local state
+    const playlist = playlists.find(p => p.id === playlistId);
+    
+    // Return the thumbnail_url if available
+    if (playlist && playlist.thumbnail_url) {
+      return playlist.thumbnail_url;
     }
-  }, []);
+    
+    return null;
+  }, [playlists]);
   
   // Delete a playlist
   const deletePlaylist = useCallback(async (id) => {
@@ -351,15 +347,20 @@ export const LibraryProvider = ({ children }) => {
         videoId
       });
       
-      // Get video data to use as playlist thumbnail if needed
-      const videoInfo = videos.find(v => v.id === videoId);
-      if (videoInfo && videoInfo.thumbnail_url) {
-        // Check if playlist already has a thumbnail
-        const playlistThumbnails = JSON.parse(localStorage.getItem('playlistThumbnails') || '{}');
-        if (!playlistThumbnails[playlistId]) {
-          // Use this video's thumbnail as the playlist thumbnail
-          playlistThumbnails[playlistId] = videoInfo.thumbnail_url;
-          localStorage.setItem('playlistThumbnails', JSON.stringify(playlistThumbnails));
+      // Get current playlist to check if it needs a thumbnail
+      const playlist = playlists.find(p => p.id === playlistId);
+      
+      // If the playlist doesn't have a thumbnail_id, update it with this video
+      if (playlist && !playlist.thumbnail_id) {
+        // Get video info
+        const videoInfo = videos.find(v => v.id === videoId);
+        
+        if (videoInfo) {
+          // Update the playlist with this video as thumbnail
+          await updatePlaylist(playlistId, {
+            name: playlist.name,
+            description: playlist.description
+          }, videoId);
         }
       }
       
@@ -373,7 +374,7 @@ export const LibraryProvider = ({ children }) => {
       const handledError = new Error('handled');
       throw handledError;
     }
-  }, [videos, success, error]);
+  }, [playlists, videos, updatePlaylist, success, error]);
   
   // Remove a video from a playlist
   const removeVideoFromPlaylist = useCallback(async (playlistId, videoId) => {
