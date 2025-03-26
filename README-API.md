@@ -406,7 +406,8 @@ GET /api/playlists
     "description": "Playlist description",
     "date_created": "2023-05-01T12:00:00.000Z",
     "last_updated": "2023-05-10T15:30:00.000Z",
-    "video_count": 25
+    "video_count": 25,
+    "thumbnail_url": "/thumbnails/dQw4w9WgXcQ.jpg"
   }
 ]
 ```
@@ -484,7 +485,8 @@ PUT /api/playlists/:id
 ```json
 {
   "name": "Updated Playlist Name",
-  "description": "Updated description"
+  "description": "Updated description",
+  "thumbnail_id": 123
 }
 ```
 
@@ -496,7 +498,8 @@ PUT /api/playlists/:id
   "description": "Updated description",
   "date_created": "2023-05-01T12:00:00.000Z",
   "last_updated": "2023-05-20T11:00:00.000Z",
-  "video_count": 25
+  "video_count": 25,
+  "thumbnail_url": "/thumbnails/dQw4w9WgXcQ.jpg"
 }
 ```
 
@@ -976,6 +979,10 @@ socket.onmessage = (event) => {
     
     case 'download_completed':
       console.log(`Download completed for ${data.youtubeId}: ${data.videoData.title}`);
+      break;
+    
+    case 'error':
+      console.log(`Download error for ${data.youtubeId}: ${data.error}`);
       break;
     
     case 'playlist_progress':
