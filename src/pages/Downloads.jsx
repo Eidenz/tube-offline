@@ -58,7 +58,6 @@ const Downloads = () => {
     try {
       const result = await cancelDownload(youtubeId);
       if (result) {
-        success('Download cancelled');
         // Refresh the lists
         fetchActiveDownloads();
         fetchFailedDownloads();
@@ -101,7 +100,7 @@ const Downloads = () => {
         </div>
         
         <motion.button
-          className="btn btn-primary"
+          className="btn btn-primary flex items-center"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => setIsDownloadModalOpen(true)}
