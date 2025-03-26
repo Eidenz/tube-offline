@@ -320,10 +320,11 @@ function getVideoInfo(url, cookiesFile = null) {
     
     ytDlp.on('close', async (code) => {
       if (code !== 0) {
-        // Check if this is an age restriction error
         if (stderr.includes('Sign in to confirm your age') || 
-          stderr.includes('age-restricted')) {
-          return reject(new Error(`Age-restricted video requires authentication: ${stderr}`));
+            stderr.includes('age-restricted') ||
+            stderr.includes('Sign in to confirm you\'re not a bot') ||
+            stderr.includes('you\'re not a bot')) {
+          return reject(new Error(`Authentication required: ${stderr}`));
         }
         
         // Check if this is a format availability error
@@ -455,7 +456,9 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
         if (code !== 0) {
           // Check if this is an age restriction error
           if (stderr.includes('Sign in to confirm your age') || 
-              stderr.includes('age-restricted')) {
+            stderr.includes('age-restricted') ||
+            stderr.includes('Sign in to confirm you\'re not a bot') ||
+            stderr.includes('you\'re not a bot')) {
             
             // Update database with error
             const updateErrorStmt = db.prepare(`
@@ -465,9 +468,9 @@ function downloadVideo(url, quality, downloadSubtitles = true, progressCallback 
               date_completed = CURRENT_TIMESTAMP
               WHERE youtube_id = ?
             `);
-            updateErrorStmt.run('Age-restricted video requires authentication. Please provide cookies.', youtubeId);
+            updateErrorStmt.run('This video requires authentication. Please provide cookies.', youtubeId);
             
-            return reject(new Error(`Age-restricted video requires authentication: ${stderr}`));
+            return reject(new Error(`Authentication required: ${stderr}`));
           }
           
           // Update database with error

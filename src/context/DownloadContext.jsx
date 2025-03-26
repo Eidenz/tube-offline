@@ -283,18 +283,19 @@ export const DownloadProvider = ({ children }) => {
   }, [success, fetchDownloadHistory, activeDownloads]);
   
   const handleDownloadError = useCallback((youtubeId, errorMessage) => {
-    // Update status in active downloads
+    console.log('Download error received:', youtubeId, errorMessage);
+    
+    // Remove the failed download from active downloads
     setActiveDownloads(prevDownloads => 
-      prevDownloads.map(download => 
-        download.youtube_id === youtubeId 
-          ? { ...download, status: 'failed', error_message: errorMessage } 
-          : download
-      )
+      prevDownloads.filter(download => download.youtube_id !== youtubeId)
     );
     
     // Show error notification
     error(`Download failed: ${errorMessage}`);
-  }, [error]);
+    
+    // Refresh download history to get updated failed downloads
+    fetchDownloadHistory();
+  }, [error, fetchDownloadHistory]);
 
   /**
    * Download a YouTube playlist

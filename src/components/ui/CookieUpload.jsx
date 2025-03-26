@@ -44,7 +44,7 @@ const CookieUpload = ({ cookiesFile, onCookiesChange, isAgeRestricted }) => {
         
         <div className="flex-1">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-yellow-500">Age-restricted video detected</h3>
+            <h3 className="text-sm font-medium text-yellow-500">Authentication required</h3>
             <button 
               onClick={() => setInfoOpen(!infoOpen)}
               className="text-yellow-500 hover:text-yellow-400 transition-colors"
@@ -61,7 +61,8 @@ const CookieUpload = ({ cookiesFile, onCookiesChange, isAgeRestricted }) => {
               exit={{ opacity: 0, height: 0 }}
             >
               <p>
-                To download age-restricted videos, you need to provide YouTube cookies from a browser where you're signed in and have confirmed your age.
+                To download this video, you need to provide YouTube cookies from a browser where you're signed in.
+                This is required for age-restricted videos or when YouTube asks for verification.
               </p>
               <p className="mt-2">
                 You can export cookies using browser extensions like "EditThisCookie" or "Cookie-Editor". 
