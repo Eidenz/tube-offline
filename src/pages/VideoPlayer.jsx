@@ -81,6 +81,9 @@ const VideoPlayer = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [currentVolume, setCurrentVolume] = useState(volume);
   const [previousVolume, setPreviousVolume] = useState(volume);
+
+  const [isLooping, setIsLooping] = useState(false);
+  const [isPlaylistLooping, setIsPlaylistLooping] = useState(false);
   
   const { 
     fetchVideo, 
@@ -95,6 +98,14 @@ const VideoPlayer = () => {
     fetchPlaylist
   } = useLibrary();
   const { success, error } = useNotification();
+
+  const toggleLooping = () => {
+    setIsLooping(!isLooping);
+  };
+
+  const togglePlaylistLooping = () => {
+    setIsPlaylistLooping(!isPlaylistLooping);
+  };
 
   // Handle toggling play/pause
   const handleTogglePlay = () => {
@@ -354,8 +365,21 @@ const VideoPlayer = () => {
 
   // Handle video end - go to next video if in playlist
   const handleVideoEnd = () => {
-    if (currentPlaylist && playlistIndex !== -1 && playlistIndex < currentPlaylist.videos.length - 1) {
-      handleNextVideo();
+    if (isLooping) {
+      // If video looping is enabled, restart the current video
+      if (playerRef.current) {
+        playerRef.current.seekTo(0);
+        setPlaying(true);
+      }
+    } else if (currentPlaylist && playlistIndex !== -1) {
+      // If we're in a playlist
+      if (playlistIndex < currentPlaylist.videos.length - 1) {
+        // If there are more videos, go to the next one
+        handleNextVideo();
+      } else if (isPlaylistLooping) {
+        // If playlist looping is enabled and we're at the end, go back to the first video
+        navigate(`/video/${currentPlaylist.videos[0].id}?playlist=${currentPlaylist.id}&index=0&fromPlaylist=true`);
+      }
     }
   };
   
@@ -629,6 +653,7 @@ const VideoPlayer = () => {
               onProgress={handleProgress}
               onDuration={handleDuration}
               onEnded={handleVideoEnd}
+              loop={isLooping}
               config={{
                 file: {
                   tracks: video.subtitle_url ? [
@@ -729,6 +754,33 @@ const VideoPlayer = () => {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.2 }}
           >
+            {/* Loop buttons */}
+            <motion.button
+              className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-secondary transition-all mr-2"
+              onClick={toggleLooping}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className={`w-6 h-6 ${isLooping ? 'text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              <span className="text-xs text-text-secondary">Loop</span>
+            </motion.button>
+            
+            {/* Playlist loop button - only show when in a playlist */}
+            {currentPlaylist && (
+              <motion.button
+                className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-secondary transition-all mr-4"
+                onClick={togglePlaylistLooping}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`w-6 h-6 ${isPlaylistLooping ? 'text-accent' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span className="text-xs text-text-secondary">Loop All</span>
+              </motion.button>
+            )}
             <motion.button
               className="flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-secondary transition-all"
               onClick={handleToggleFavorite}
