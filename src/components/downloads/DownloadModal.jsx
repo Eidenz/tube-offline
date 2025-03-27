@@ -101,7 +101,8 @@ const DownloadModal = ({ isOpen, onClose }) => {
     setIsPlaylist(isPlaylistUrl);
     
     // Basic validation for YouTube URL
-    const isValidUrl = newUrl.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/i);
+    //const isValidUrl = newUrl.match(/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/i);
+    const isValidUrl = newUrl.match(/^https?:\/\/.+\/.+$/i); // Disable URL validation for now, yt-dlp handles many URL formats, and TubeOffline seems to be flexible
     setIsUrlValid(Boolean(isValidUrl));
     
     if (isValidUrl) {
